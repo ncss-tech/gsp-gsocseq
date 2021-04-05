@@ -10,4 +10,4 @@ Deadline = April 30th!!!
 
 [Recording](https://drive.google.com/drive/folders/1Wmv8yAMjJNmWNrf0zIP64XRoV2OXbVqQ)
 
-[GitHub](https://github.com/FAO-GSP/GBSmap)
+[FAO-GitHub](https://github.com/FAO-GSP/GSOCseq)
