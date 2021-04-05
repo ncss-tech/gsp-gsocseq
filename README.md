@@ -1,5 +1,4 @@
 # gsp-gsocseq
-Workspace for the Global Soil Organic Carbon Sequestration project.
 
 Deadline = April 30th!!!
 
