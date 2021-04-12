@@ -7,14 +7,29 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 
 # fetch SSURGO ----
 
-f_us <- fetchGDB(dsn ="D:/geodata/soils/gNATSGO_CONUS_FY20.gdb", WHERE = "areasymbol LIKE '%'")
+# f_us <- fetchGDB(dsn ="D:/geodata/soils/gNATSGO_CONUS_FY20.gdb", WHERE = "areasymbol LIKE '%'")
+# save(f_us, file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
+load(file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
+
 mu_us <- get_mapunit_from_GDB(dsn = "D:/geodata/soils/gNATSGO_CONUS_FY20.gdb", stats = TRUE)
-# save(f_us, mu_us, file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
+mu_us$source <- "gnatsgo"
+
+mu_us$idx <- rep(1:100, length.out = nrow(mu_us))
+f_ssurgo <- {
+  split(mu_us, mu_us$idx) ->.;
+  lapply(., function(x) {
+    cat("getting ", unique(x$idx), "\n")
+    temp <- fetchSDA(WHERE = paste("areasymbol != 'US' AND ", "mukey IN ('", paste0(x$mukey, collapse = "', '"), "')"), childs = FALSE, duplicates = FALSE)
+  }) ->.;
+}
+# save(f_us, file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
 load(file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
 
 
-# fetch STATSGO2, horizon data seems to be missing from gNATSGO
+# fetch STATSGO2 ----
+# some horizon data seems to be missing from gNATSGO
 mu_statsgo <- get_mapunit_from_SDA(WHERE = "areasymbol = 'US'")
+mu_statsgo$source <- "statsgo"
 mu_statsgo$idx <- rep(1:4, length.out = nrow(mu_statsgo))
 f_statsgo <- {
   split(mu_statsgo, mu_statsgo$idx) ->.;
@@ -37,6 +52,18 @@ f_statsgo_seg <- segment(f_statsgo, intervals = c(0, 30))
 h_us      <- horizons(f_us_seg)
 h_statsgo <- horizons(f_statsgo_seg)
 
+
+
+
+# combine ssurgo and statsgo
+idx <- names(mu_us)[names(mu_us) %in% names(mu_statsgo)]
+mu <- rbind(mu_us[idx], mu_statsgo[idx])
+
+idx <- siteNames(f_us)[siteNames(f_us) %in% siteNames(f_statsgo)]
+s <- rbind(cbind(source = "gnatsgo", site(f_us)[idx]), 
+           cbind(source = "statsgo", site(f_statsgo)[idx])
+           )
+
 idx <- sapply(h_us, is.factor)
 h_us[idx] <- lapply(h_us[idx], as.character)
 idx <- sapply(h_statsgo, is.factor)
@@ -51,15 +78,16 @@ h <- rbind(
   
 
 mu_agg <- h %>%
-  mutate(soc = om_r / 1.724,
-         thk = hzdepb_r - hzdept_r
+  mutate(soc   = om_r / 1.724,
+         thk   = hzdepb_r - hzdept_r,
+         stock = thk * (soc * dbthirdbar_r / 100) * ((100 - fragvol_r) / 100)
          ) %>%
   group_by(source, cokey) %>%
   summarize(soc_wt  = weighted.mean(soc,         w = thk, na.rm = TRUE),
             clay_wt = weighted.mean(claytotal_r, w = thk, na.rm = TRUE) 
             ) %>%
-  right_join(site(f_us), by = "cokey") %>%
-  right_join(mu_us,      by = "mukey") %>%
+  right_join(s,  by = c("cokey", "source")) %>%
+  right_join(mu, by = c("mukey", "source")) %>%
   group_by(source, mukey, musym, muname) %>%
   summarize(
     soc_wt  = round(weighted.mean(soc_wt,  w = comppct_r, na.rm = TRUE), 2),
@@ -67,13 +95,12 @@ mu_agg <- h %>%
     ) %>%
   ungroup() %>%
   as.data.frame()
-mu_agg <- mu_agg[c(2:6, 1)]
 # write.csv(mu_agg, file = "gnatsgo_gsoc.csv", row.names = FALSE)
 mu_agg <- read.csv(file = "gnatsgo_gsoc.csv", stringsAsFactors = FALSE)
 
 
 
-# rasterize ----
+# rasterize SSURGO ----
 
 library(raster)
 
@@ -89,7 +116,7 @@ lapply(vars, function(x) {
   cat(x, as.character(Sys.time()), "\n")
   # beginCluster(type = "SOCK")
   deratify(r, att = x, 
-           filename = paste0("D:/geodata/project_data/gsp-gsocseq/gnatsgo_fy20_1km_", x, ".tif"),
+           filename = paste0("D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_1km_", x, ".tif"),
            options = c("COMPRESS=DEFLATE"), 
            overwrite = TRUE, 
            progress = "text" 
@@ -114,7 +141,7 @@ gdalUtils::gdalwarp(
 )
 
 
-# rasterize
+# rasterize STATSGO2
 
 library(sf)
 library(raster)
@@ -123,12 +150,69 @@ library(gdalUtils)
 r  <- raster("D:/geodata/soils/gnatsgo_fy20_30m_compress.tif")
 writeRaster(r, filename = "D:/geodata/soils/gstatsgo2_fy20_30m.tif", datatype = "INT4U", progress = "text", overwrite = TRUE)
 
+mu_agg$mukey2 <- as.character(mu_agg$mukey)
+
 gsm <- read_sf(dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us.shp")
 gsm$mukey2 <- as.integer(gsm$MUKEY)
+gsm <- left_join(gsm, mu_agg[mu_agg$source == "statsgo", ], by = c("MUKEY" = "mukey2"))
 gsm <- st_transform(gsm, crs = proj4string(r))
-write_sf(gsm, dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp", delete_dsn = TRUE)
+# write_sf(gsm, dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp", delete_dsn = TRUE)
+gsm <- read_sf(dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp")
+
+
+
+# mukey
+vars <- c("mukey", "soc_wt", "clay_wt")[3:2]
+lapply(vars, function(x) {
+  cat("rasterizing ", x, "\n")
+  
+  prec <- ifelse(x == "soc_wt", "Float32", "Int32")
+  
+  system(paste0('"C:/OSGeo4W64/bin/gdal_rasterize.exe" -a "', x, '" -l "gsmsoilmu_a_us2" -te -2356155 270015 2263815 3172635 -tr 1000 1000 -ot ', prec, ' -a_nodata -9999 "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp" "D:/geodata/project_data/gsp-gsocseq/gstatsgo2_fy20_30m_"', x, '".tif"'))
+})
 
 system('"C:/OSGeo4W64/bin/gdal_rasterize.exe" -a "mukey2" -l "gsmsoilmu_a_us2" -te -2356155 270015 2263815 3172635 -tr 30 30 -ot Int32 "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp" "D:/geodata/soils/gstatsgo2_fy20_30m.tif"')
 
+
+
 system('"C:/OSGeo4W64/bin/gdalwarp.exe" -overwrite  -te -2356155 270015 2263815 3172635 -tr 1000 1000 -t_srs "+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs" -ot "Int32" -r "near" -of "GTiff" "D:/geodata/soils/gstatsgo2_fy20_30m.tif" "D:/geodata/soils/gstatsgo2_fy20_1km.tif"')
+
+
+
+# combine SSURGO & STATSGO2
+
+lf <- list.files(getwd(), pattern = ".tif$")
+
+ssurgo_st  <- readAll(stack(lf[grepl("ssurgo", lf)]))
+
+statsgo_st <- readAll(stack(lf[grepl("statsgo", lf)]))
+projection(statsgo_st) <- crs("+init=epsg:5070")
+
+statsgo_st <- projectRaster(from = statsgo_st, to = ssurgo_st, method = "bilinear", progress = "text")
+
+gnatsgo_clay <- merge(
+  ssurgo_st$gnatsgo_fy20_1km_clay_wt, 
+  statsgo_st$gstatsgo2_fy20_30m_clay_wt,
+  filename = "gnatsgo_fy20_1km_clay_wt.tif"
+  )
+
+
+gnatsgo_soc <- merge(
+  ssurgo_st$gnatsgo_fy20_1km_soc_wt, 
+  statsgo_st$gstatsgo2_fy20_30m_soc_wt,
+  filename = "gnatsgo_fy20_1km_soc_wt.tif"
+)
+
+
+# landcover ----
+lc <- raster("D:/geodata/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
+projection(lc) <- "+init=epsg:4326"
+
+lc2 <- crop(lc, ssurgo_st, file = "glc_shv10_DOM_CONUS.tif", progress = "text")
+
+
+# GSOC ----
+gsoc <- raster("D:/geodata/soils/GSOCmap1.5.0.tif")
+gsoc2 <- crop(gsoc, ssurgo_st)
+gsoc2 <- resample(gsoc2, ssurgo_st, method = "ngb", filename =  "GSOCmap1.5.0_CONUS.tif", progress = "text")
 
