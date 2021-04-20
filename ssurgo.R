@@ -1,29 +1,116 @@
 library(aqp)
 library(soilDB)
 library(dplyr)
+library(sf)
+library(rmapshaper)
 
 setwd("D:/geodata/project_data/gsp-gsocseq")
 
 
-# fetch SSURGO ----
+# fetch gNATSGO ----
 
 # f_us <- fetchGDB(dsn ="D:/geodata/soils/gNATSGO_CONUS_FY20.gdb", WHERE = "areasymbol LIKE '%'")
+mu_us <- get_mapunit_from_GDB(dsn = "D:/geodata/soils/gNATSGO_CONUS_FY20.gdb", stats = TRUE)
+mu_us$source <- "gnatsgo"
 # save(f_us, file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
 load(file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
 
-mu_us <- get_mapunit_from_GDB(dsn = "D:/geodata/soils/gNATSGO_CONUS_FY20.gdb", stats = TRUE)
-mu_us$source <- "gnatsgo"
 
+conus_sa <- read_sf(dsn = "D:/geodata/soils/gSSURGO_CONUS_FY20_july.gdb", layer = "SAPOLYGON")
+conus_sa <- conus_sa %>%
+  ms_simplify() %>%
+  mutate(asym = "CONUS") %>%
+  ms_dissolve(field = "asym")
+write_sf(conus_sa, dsn = "CONUS.shp")
+
+aoi_conus_bufbox <- conus_sa %>%
+  st_buffer(dist = 1000 * 100) %>%
+  st_bbox() %>%
+  st_as_sfc() %>%
+  st_transform(crs = 4326)
+mapview::mapview(aoi_conus_bufbox)
+write_sf(aoi_conus_buf, dsn = "AOI_CONUS_bufbox.shp", delete_layer = TRUE)
+
+
+# fetchSSURGO ----
 mu_us$idx <- rep(1:100, length.out = nrow(mu_us))
 f_ssurgo <- {
   split(mu_us, mu_us$idx) ->.;
   lapply(., function(x) {
     cat("getting ", unique(x$idx), "\n")
-    temp <- fetchSDA(WHERE = paste("areasymbol != 'US' AND ", "mukey IN ('", paste0(x$mukey, collapse = "', '"), "')"), childs = FALSE, duplicates = FALSE)
+    temp <- fetchSDA(WHERE = paste("areasymbol != 'US' AND ", "mukey IN ('", paste0(x$mukey, collapse = "', '"), "')"), childs = FALSE, duplicates = TRUE)
   }) ->.;
 }
-# save(f_us, file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
+# save(f_ssurgo, file = "f_ssurgo_list.RData")
+load(file = "f_ssurgo_list.RData")
+
+f_s <- do.call("rbind", lapply(f_ssurgo, site))
+f_h <- do.call("rbind", lapply(f_ssurgo, horizons))
+
+f_s <- f_s[!duplicated(paste(f_s$nationalmusym, f_s$cokey)), ]
+f_h <- f_h[!duplicated(paste(f_h$cokey, f_h$chkey)), ]
+
 load(file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
+
+
+# OCONUS
+
+library(sf)
+
+asym <- c("AS", "AK", "FM", "GU", "HI", "MH", "MP", "PR", "PW", "VI")
+leg <- lapply(asym, function(x) get_legend_from_SDA(WHERE = paste0("areasymbol LIKE '", x, "%'")))
+leg <- do.call("rbind", leg)
+leg$asym <- substr(leg$areasymbol, 1, 2)
+
+sapol <- {
+  split(leg, leg$asym) ->.;
+  lapply(., function(x) {
+    cat("fetching ", x$areasymbol, "\n")
+    temp = fetchSDA_spatial(x$areasymbol, geom.src = "sapolygon")
+    temp = sf::st_as_sf(temp)
+  }) ->.;
+}
+# saveRDS(sapol, file = "sapol_oconus.rds")
+sapol <- readRDS("sapol_oconus.rds")
+
+sapol_bndy <- lapply(sapol, function(x) {
+  
+  x$asym = substr(x$areasymbol, 1, 2)
+  # if (asym == "AK") {
+  #   split(x, x$areasymbol) ->.;
+  #   lapply(., function(x) {
+  #     test = as.data.frame(st_coordinates(x))
+  #     x$test = any(test$X > 0)
+  #     return(x)
+  #     }) ->.;
+  #   do.call("rbind", .) ->.;
+  # }
+  x$asym = ifelse(x$areasymbol %in% paste0("AK", 783:788), "AK2", x$asym)
+  temp = ms_simplify(x) %>%
+    ms_dissolve(field = "asym") %>%
+    ms_explode()
+  return(temp)
+  })
+
+sapol_bufbox <- {
+  do.call("rbind", sapol_bndy) ->.;
+  split(., sapol_bndy$asym) ->.;
+  lapply(., function(x) {
+    temp <- x %>%
+      st_transform(crs = 6933) %>%
+      st_buffer(dist = 1000 * if(all(x$asym == "AK2")) 10 else 50) %>%
+      st_bbox() %>%
+      st_as_sfc() %>%
+      st_transform(crs = 4326) %>%
+      st_as_sf()
+    temp$asym <- unique(x$asym)
+    return(temp)
+  }) -> .;
+}
+
+lapply(sapol_bufbox, function(x) write_sf(x, dsn = paste0("AOI_OCONUS_", x$asym, "_bufbox.shp")))
+lapply(sapol_bndy, function(x) write_sf(x, dsn = paste0("OCONUS_", x$asym, "_boundry.shp")))
+
 
 
 # fetch STATSGO2 ----
@@ -204,15 +291,4 @@ gnatsgo_soc <- merge(
 )
 
 
-# landcover ----
-lc <- raster("D:/geodata/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
-projection(lc) <- "+init=epsg:4326"
-
-lc2 <- crop(lc, ssurgo_st, file = "glc_shv10_DOM_CONUS.tif", progress = "text")
-
-
-# GSOC ----
-gsoc <- raster("D:/geodata/soils/GSOCmap1.5.0.tif")
-gsoc2 <- crop(gsoc, ssurgo_st)
-gsoc2 <- resample(gsoc2, ssurgo_st, method = "ngb", filename =  "GSOCmap1.5.0_CONUS.tif", progress = "text")
 
