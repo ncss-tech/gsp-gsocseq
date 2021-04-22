@@ -193,20 +193,21 @@ mu_agg <- read.csv(file = "gnatsgo_gsoc.csv", stringsAsFactors = FALSE)
 # rasterize SSURGO ----
 
 library(raster)
+# library(terra)
 
-r <- raster("D:/geodata/soils/gnatsgo_fy20_1km.tif")
+r <- raster("D:/geodata/soils/gnatsgo_fy20_90m.tif")
 # r2 <- r[1:100, 1:100, drop = FALSE]
-# r2 <- ratify(r2)
-# rat <- levels(r2)[[1]]
-names(mu_agg)[1] <- "ID"
-levels(r) <- subset(mu_agg, source == "gnatsgo")
+mu_agg2 <- subset(mu_agg, source == "gnatsgo")[2:5]
+names(mu_agg2)[1] <- "ID"
+levels(r) <- mu_agg2
+r <- readAll(r)
 
 vars <- c("soc_wt", "clay_wt")
 lapply(vars, function(x) {
   cat(x, as.character(Sys.time()), "\n")
   # beginCluster(type = "SOCK")
   deratify(r, att = x, 
-           filename = paste0("D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_1km_", x, ".tif"),
+           filename = paste0("D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_90m_", x, ".tif"),
            options = c("COMPRESS=DEFLATE"), 
            overwrite = TRUE, 
            progress = "text" 

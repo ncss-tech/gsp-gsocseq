@@ -10,7 +10,7 @@ aoi <- read_sf(dsn = "AOI_CONUS_bufbox.shp")
 gsoc <- raster("D:/geodata/soils/GSOCmap1.5.0.tif")
 gsoc2 <- crop(gsoc, aoi)
 # writeRaster(gsoc2, filename =  "GSOCmap1.5.0_CONUS.tif", progress = "text", overwrite = TRUE)
-
+gsoc2 <- raster("GSOCmap1.5.0_CONUS.tif")
 
 cms_soc <- raster("D:/geodata/soils/CMS_SOC_Mexico_CONUS_1737/data/SOC_prediction_1991_2010.tif")
 cms_soc_1km <- aggregate(cms_soc, fact = 4, fun = mean, progress = "text")
@@ -119,10 +119,10 @@ ppt0121_avg_yr <- avgRSyr(ppt0121, "pr", yrs0121)
 
 
 # resample to GSOC extent
-tmp8100_avg_yr <- resample(readAll(tmp8100_avg_yr), gsoc2, method = "bilinear", progress = "text")
-tmp0121_avg_yr <- resample(readAll(tmp0121_avg_yr), gsoc2, method = "bilinear", progress = "text")
-ppt8100_avg_yr <- resample(readAll(ppt8100_avg_yr), gsoc2, method = "bilinear", progress = "text")
-ppt0121_avg_yr <- resample(readAll(ppt0121_avg_yr), gsoc2, method = "bilinear", progress = "text")
+tmp8100_avg_yr <- resample(readAll(tmp8100_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
+tmp0121_avg_yr <- resample(readAll(tmp0121_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
+ppt8100_avg_yr <- resample(readAll(ppt8100_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
+ppt0121_avg_yr <- resample(readAll(ppt0121_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
 
 
 # cache averages by year
@@ -150,19 +150,97 @@ npp8100 <- lapply(1:20, function(i) {
   npp <- min(npp8100_tmp[[i]], npp8100_ppt[[i]], na.rm = TRUE)
 })
 npp8100 <- stack(npp8100)
-npp8100 <- npp8100 * 1/100 * 0.5
-writeRaster(npp8100, filename = "CONUS_NPP_MIAMI_tnC_Ha_Year_STACK_81-00.tif", overwrite = TRUE)
+npp8100_TnCHaYr <- npp8100 * 1/100 * 0.5
+writeRaster(npp8100_TnCHaYr, filename = "CONUS_NPP_MIAMI_tnC_Ha_Year_STACK_81-00.tif", overwrite = TRUE, options = c("COMPRESS=DEFLATE"))
 
-npp8100_avg <- mean(npp8100) 
+npp8100_TnCHaYr_avg <- mean(npp8100_TnCHaYr) 
+writeRaster(npp8100_TnCHaYr_avg, filename = "CONUS_NPP_MIAMI_MEAN_81-00_AOI.tif", overwrite = TRUE, options = c("COMPRESS=DEFLATE"))
+
+
+# Uncertainties ----
+
+library(terra)
+
+tmp8100 <- rast("CONUS_AverageTemperature_1981-2001.tif")
+ppt8100 <- rast("CONUS_Precipitation_1981-2001.tif")
+
+
+# Min
+tmp8100_min <- stack(tmp8100 * 1.02)
+ppt8100_min <- stack(ppt8100 * 0.95)
+
+tmp8100_min_avg <- avgRSyr(tmp8100_min, "tmmx", yrs8100) * 0.1
+ppt8100_min_avg <- avgRSyr(ppt8100_min, "pr", yrs8100)
+
+npp8100_min_avg_tmp <- 3000 * (1 - exp(-0.000664 * ppt8100_min_avg))
+npp8100_min_avg_ppt <- 3000 / (1 + exp(1.315 - 0.119 * tmp8100_min_avg))
+
+npp8100_min <- lapply(1:20, function(i) {
+  cat("calculating min from ", i, "\n")
+  npp <- min(npp8100_min_avg_tmp[[i]], npp8100_min_avg_tmp[[i]], na.rm = TRUE)
+})
+npp8100_min <- stack(npp8100_min)
+npp8100_min_TnCHaYr <- stack(npp8100_min) * 1/100 * 0.5
+
+npp8100_min_TnCHaYr <- resample(npp8100_min_TnCHaYr, gsoc2, method = "bilinear", progress = "text")
+
+writeRaster(npp8100_min_TnCHaYr, 
+            filename = "CONUS_NPP_MIAMI_tnC_Ha_Year_STACK_81-00_MIN.tif", 
+            overwrite = TRUE, 
+            options = c("COMPRESS=DEFLATE")
+            )
+
+npp8100_min_TnCHaYr_avg <- mean(npp8100_min_TnCHaYr) 
+writeRaster(npp8100_min_TnCHaYr_avg, 
+            filename = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MIN.tif", 
+            overwrite = TRUE, 
+            options = c("COMPRESS=DEFLATE")
+            )
+
+
+# Max
+tmp8100_max <- stack(tmp8100 * 0.98)
+ppt8100_max <- stack(ppt8100 * 1.05)
+
+tmp8100_max_avg <- avgRSyr(tmp8100_max, "tmmx", yrs8100) * 0.1
+ppt8100_max_avg <- avgRSyr(ppt8100_max, "pr", yrs8100)
+
+npp8100_max_avg_tmp <- 3000 * (1 - exp(-0.000664 * ppt8100_max_avg))
+npp8100_max_avg_ppt <- 3000 / (1 + exp(1.315 - 0.119 * tmp8100_max_avg))
+
+npp8100_max <- lapply(1:20, function(i) {
+  cat("calculating min from ", i, "\n")
+  npp <- min(npp8100_max_avg_tmp[[i]], npp8100_max_avg_tmp[[i]], na.rm = TRUE)
+})
+npp8100_max <- stack(npp8100_max)
+npp8100_max_TnCHaYr <- stack(npp8100_max) * 1/100 * 0.5
+
+npp8100_max_TnCHaYr <- resample(readAll(npp8100_max_TnCHaYr), gsoc2, method = "bilinear", progress = "text")
+
+writeRaster(npp8100_max_TnCHaYr, 
+            filename = "CONUS_NPP_MIAMI_tnC_Ha_Year_STACK_81-00_MAX.tif", 
+            overwrite = TRUE, 
+            options = c("COMPRESS=DEFLATE")
+            )
+
+npp8100_max_TnCHaYr_avg <- mean(npp8100_max_TnCHaYr) 
+writeRaster(npp8100_max_TnCHaYr_avg, 
+            filename = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif", 
+            overwrite = TRUE, 
+            options = c("COMPRESS=DEFLATE")
+            )
+
+
 
 
 # landcover ----
+
 lc <- raster("D:/geodata/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
 projection(lc) <- "+init=epsg:4326"
 
-lc2 <- crop(lc, ssurgo_st, file = "glc_shv10_DOM_CONUS.tif", progress = "text")
-
-
+lc2 <- crop(lc, gsoc2, progress = "text")
+lc2 <- resample(readAll(lc2), gsoc2, method = "ngb", progress = "text", datatype = "INT1S")
+# writeRaster(lc2, file = "CONUS_glc_shv10_DOM.tif", overwrite = TRUE)
 
 
 
