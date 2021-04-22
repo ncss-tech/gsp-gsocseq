@@ -24,12 +24,14 @@ conus_sa <- conus_sa %>%
 write_sf(conus_sa, dsn = "CONUS.shp")
 
 aoi_conus_bufbox <- conus_sa %>%
+  mutate(asym = "CONUS") %>%
+  ms_dissolve(field = "asym") %>%
   st_buffer(dist = 1000 * 100) %>%
+  st_transform(crs = 4326) %>%
   st_bbox() %>%
-  st_as_sfc() %>%
-  st_transform(crs = 4326)
+  st_as_sfc()
 mapview::mapview(aoi_conus_bufbox)
-write_sf(aoi_conus_buf, dsn = "AOI_CONUS_bufbox.shp", delete_layer = TRUE)
+write_sf(aoi_conus_bufbox, dsn = "AOI_CONUS_bufbox.shp", delete_dsn = TRUE)
 
 
 # fetchSSURGO ----
@@ -74,7 +76,6 @@ sapol <- {
 sapol <- readRDS("sapol_oconus.rds")
 
 sapol_bndy <- lapply(sapol, function(x) {
-  
   x$asym = substr(x$areasymbol, 1, 2)
   # if (asym == "AK") {
   #   split(x, x$areasymbol) ->.;
@@ -94,19 +95,21 @@ sapol_bndy <- lapply(sapol, function(x) {
 
 sapol_bufbox <- {
   do.call("rbind", sapol_bndy) ->.;
-  split(., sapol_bndy$asym) ->.;
+  split(., .$asym) ->.;
   lapply(., function(x) {
     temp <- x %>%
       st_transform(crs = 6933) %>%
-      st_buffer(dist = 1000 * if(all(x$asym == "AK2")) 10 else 50) %>%
+      st_buffer(dist = 1000 * if(all(x$asym == "AK2")) 10 else 10) %>%
+      st_transform(crs = 4326) %>%
       st_bbox() %>%
       st_as_sfc() %>%
-      st_transform(crs = 4326) %>%
       st_as_sf()
     temp$asym <- unique(x$asym)
     return(temp)
   }) -> .;
 }
+test <- sapol_bufbox$PR
+mapview::mapview(test)
 
 lapply(sapol_bufbox, function(x) write_sf(x, dsn = paste0("AOI_OCONUS_", x$asym, "_bufbox.shp")))
 lapply(sapol_bndy, function(x) write_sf(x, dsn = paste0("OCONUS_", x$asym, "_boundry.shp")))
