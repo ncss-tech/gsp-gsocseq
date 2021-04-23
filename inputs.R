@@ -18,6 +18,20 @@ cms_soc_1km <- readAll(cms_soc_1km)
 cms_soc_1km <- projectRaster(from = cms_soc_1km, to = ssurgo_st, filename = "cms_soc_1km.tif", method = "bilinear", progress = "text", overwrite = TRUE)
 
 
+# clay ----
+clay <- readAll(raster("gnatsgo_fy20_1km_clay_wt.tif"))
+clay_4326 <- projectRaster(
+  clay, 
+  gsoc2, 
+  filename = "CONUS_gnatsgo_fy20_1km_clay_wt.tif", 
+  method = "bilinear", 
+  progress = "text", 
+  overwrite = TRUE, 
+  datatype = "INT4S"
+  )
+
+
+
 
 # TerraClimate ----
 
@@ -232,15 +246,78 @@ writeRaster(npp8100_max_TnCHaYr_avg,
 
 
 
+# Vegetation Cover ----
+vars <- paste0("NDVI_2000-2020_prop_gt_06_CR_MES_", formatC(1:12, width = 2, flag = "0"), "_conus.tif")
+veg <- stack(vars)
+veg <- (veg * -0.4) + 1
+veg2 <- resample(readAll(veg), gsoc2, method = "bilinear", progress = "text")
+# writeRaster(veg2, filename = "CONUS_Cov_stack_AOI.tif", options = c("COMPRESS=DEFLATE"), progress = "text", overwrite = TRUE)
 
-# landcover ----
 
+
+# Landcover ----
+# http://www.fao.org/geonetwork/srv/en/main.home?uuid=ba4526fd-cdbf-4028-a1bd-5a559c4bff38
 lc <- raster("D:/geodata/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
 projection(lc) <- "+init=epsg:4326"
 
 lc2 <- crop(lc, gsoc2, progress = "text")
 lc2 <- resample(readAll(lc2), gsoc2, method = "ngb", progress = "text", datatype = "INT1S")
 # writeRaster(lc2, file = "CONUS_glc_shv10_DOM.tif", overwrite = TRUE)
+LU_AOI <- readAll(raster("CONUS_glc_shv10_DOM.tif"))
+
+
+
+# DR layer ----
+dr <- (LU_AOI == 2 | LU_AOI == 12| LU_AOI == 13) * 1.44 + (LU_AOI == 4) *  0.25 + (LU_AOI == 3 | LU_AOI == 5 | LU_AOI == 6 | LU_AOI == 8) * 0.67
+# writeRaster(dr, file = "CONUS_glc_shv10_DOM_DR.tif", overwrite = TRUE)
+
+
+
+# Stack layers ----
+# Spin up layers
+vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
+          CLAY = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
+          TEMP = "CONUS_Temp_Stack_81-00_TC.tif",
+          PREC = "CONUS_Prec_Stack_81-00_TC.tif",
+          PET  = "CONUS_PET_Stack_81-00_TC.tif",
+          LU   = "CONUS_glc_shv10_DOM.tif",
+          DR   = "CONUS_glc_shv10_DOM_DR.tif",
+          COV  = "CONUS_Cov_stack_AOI.tif"
+          )
+su_rs <- stack(vars)
+# writeRaster(su_rs, filename = "Stack_Set_SPIN_UP_AOI.tif", format = "GTiff", progress = "text", overwrite = TRUE)
+
+
+# Warm up layers
+n_wu <- 18
+
+vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
+          CLAY = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
+          COV  = "CONUS_Cov_stack_AOI.tif",
+          DR   = "CONUS_glc_shv10_DOM_DR.tif"
+)
+
+LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
+
+wu_rs <- stack(vars, LU)
+# writeRaster(wu_rs, filename = "Stack_Set_WARM_UP_AOI.tif", format = "GTiff", progress = "text", overwrite = TRUE)
+
+
+# Forward Stack
+vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
+          CLAY = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
+          TEMP = "CONUS_Temp_Stack_01-19_TC.tif",
+          PREC = "CONUS_Prec_Stack_01-19_TC.tif",
+          PET  = "CONUS_PET_Stack_01-19_TC.tif",
+          DR   = "CONUS_glc_shv10_DOM_DR.tif",
+          LU   = "CONUS_glc_shv10_DOM.tif",
+          COV  = "CONUS_Cov_stack_AOI.tif"
+)
+fs_rs <- stack(vars)
+# writeRaster(Stack_Set_AR, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
+
+
+
 
 
 

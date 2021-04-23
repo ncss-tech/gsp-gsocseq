@@ -197,7 +197,7 @@ library(raster)
 
 r <- raster("D:/geodata/soils/gnatsgo_fy20_90m.tif")
 # r2 <- r[1:100, 1:100, drop = FALSE]
-mu_agg2 <- subset(mu_agg, source == "gnatsgo")[2:5]
+mu_agg2 <- subset(mu_agg, source == "gnatsgo")[2:6]
 names(mu_agg2)[1] <- "ID"
 levels(r) <- mu_agg2
 r <- readAll(r)
@@ -214,6 +214,9 @@ lapply(vars, function(x) {
   )
   # endCluster()
 })
+
+
+system('"C:/OSGeo4W64/bin/gdalwarp.exe" -overwrite  -te -2356155 270045 2263815 3172635 -tr 1000 1000 -t_srs "EPSG:5070" -ot "Int32" -r "average" -of "GTiff" "D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_90m_clay_wt.tif" "D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_1km_clay_wt.tif"')
 
 
 gnatsgo <- "D:/geodata/soils/gnatsgo_fy20_30m.tif"
@@ -253,13 +256,13 @@ gsm <- read_sf(dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmso
 
 
 # mukey
-vars <- c("mukey", "soc_wt", "clay_wt")[3:2]
+vars <- c("mukey", "soc_wt", "clay_wt")[3]
 lapply(vars, function(x) {
   cat("rasterizing ", x, "\n")
   
   prec <- ifelse(x == "soc_wt", "Float32", "Int32")
   
-  system(paste0('"C:/OSGeo4W64/bin/gdal_rasterize.exe" -a "', x, '" -l "gsmsoilmu_a_us2" -te -2356155 270015 2263815 3172635 -tr 1000 1000 -ot ', prec, ' -a_nodata -9999 "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp" "D:/geodata/project_data/gsp-gsocseq/gstatsgo2_fy20_30m_"', x, '".tif"'))
+  system(paste0('"C:/OSGeo4W64/bin/gdal_rasterize.exe" -a "', x, '" -l "gsmsoilmu_a_us2" -te -2356155 269635 2263845 3172635 -tr 1000 1000 -ot ', prec, ' -a_nodata -9999 "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp" "D:/geodata/project_data/gsp-gsocseq/gstatsgo2_fy20_1km_"', x, '".tif"'))
 })
 
 system('"C:/OSGeo4W64/bin/gdal_rasterize.exe" -a "mukey2" -l "gsmsoilmu_a_us2" -te -2356155 270015 2263815 3172635 -tr 30 30 -ot Int32 "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp" "D:/geodata/soils/gstatsgo2_fy20_30m.tif"')
@@ -274,17 +277,14 @@ system('"C:/OSGeo4W64/bin/gdalwarp.exe" -overwrite  -te -2356155 270015 2263815 
 
 lf <- list.files(getwd(), pattern = ".tif$")
 
-ssurgo_st  <- readAll(stack(lf[grepl("ssurgo", lf)]))
-
-statsgo_st <- readAll(stack(lf[grepl("statsgo", lf)]))
-projection(statsgo_st) <- crs("+init=epsg:5070")
-
-statsgo_st <- projectRaster(from = statsgo_st, to = ssurgo_st, method = "bilinear", progress = "text")
+ssurgo_st  <- readAll(raster("D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_1km_clay_wt.tif"))
+statsgo_st <- readAll(raster("D:/geodata/project_data/gsp-gsocseq/gstatsgo2_fy20_1km_clay_wt.tif"))
 
 gnatsgo_clay <- merge(
-  ssurgo_st$gnatsgo_fy20_1km_clay_wt, 
-  statsgo_st$gstatsgo2_fy20_30m_clay_wt,
-  filename = "gnatsgo_fy20_1km_clay_wt.tif"
+  ssurgo_st, 
+  statsgo_st,
+  filename = "gnatsgo_fy20_1km_clay_wt.tif",
+  overwrite = TRUE
   )
 
 
