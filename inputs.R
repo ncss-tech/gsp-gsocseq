@@ -363,8 +363,13 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           DR   = "CONUS_glc_shv10_DOM_DR.tif",
           COV  = "CONUS_Cov_stack_AOI.tif"
           )
-su_rs <- stack(vars)
+su_rs <- readAll(stack(vars))
 # writeRaster(su_rs, filename = "Stack_Set_SPIN_UP_AOI.tif", format = "GTiff", progress = "text", overwrite = TRUE)
+
+su_rs <- readAll(su_rs)
+su_pts <- rasterToPoints(su_rs, spatial = TRUE, progress = "text")
+su_pts2 <- subset(su_pts, as.character(LU) %in% c(2, 3, 5, 12))
+saveRDS(su_pts2, file = "su_pts.RDS")
 
 
 # Warm up layers
@@ -407,5 +412,11 @@ pts <- subset(pts, CONUS_glc_shv10_DOM %in% c(2, 3, 5, 12))
 table(pts$CONUS_glc_shv10_DOM)
 
 pts <- as(pts, 'SpatialPoints')
+write_sf(st_as_sfc(pts), dsn = "target_points.shp")
 
+
+su_rs <- readAll(stack("Stack_Set_SPIN_UP_AOI.tif"))
+su_pts <- rasterToPoints(su_rs, spatial = TRUE, progress = "text")
+su_pts2 <- subset(su_pts, as.character(LU) %in% c(2, 3, 5, 12))
+saveRDS(su_pts2, file = "su_pts.RDS")
 
