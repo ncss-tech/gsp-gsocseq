@@ -5,6 +5,84 @@ library(rmapshaper)
 setwd("D:/geodata/project_data/gsp-gsocseq")
 
 
+# AOI ----
+# CONUS
+conus_sa <- read_sf(dsn = "D:/geodata/soils/gSSURGO_CONUS_FY20_july.gdb", layer = "SAPOLYGON")
+conus_sa <- conus_sa %>%
+  ms_simplify() %>%
+  mutate(asym = "CONUS") %>%
+  ms_dissolve(field = "asym")
+write_sf(conus_sa, dsn = "CONUS.shp")
+
+aoi_conus_bufbox <- conus_sa %>%
+  mutate(asym = "CONUS") %>%
+  ms_dissolve(field = "asym") %>%
+  st_buffer(dist = 1000 * 100) %>%
+  st_transform(crs = 4326) %>%
+  st_bbox() %>%
+  st_as_sfc()
+mapview::mapview(aoi_conus_bufbox)
+write_sf(aoi_conus_bufbox, dsn = "AOI_CONUS_bufbox.shp", delete_dsn = TRUE)
+
+
+# OCONUS
+asym <- c("AS", "AK", "FM", "GU", "HI", "MH", "MP", "PR", "PW", "VI")
+leg <- lapply(asym, function(x) get_legend_from_SDA(WHERE = paste0("areasymbol LIKE '", x, "%'")))
+leg <- do.call("rbind", leg)
+leg$asym <- substr(leg$areasymbol, 1, 2)
+
+sapol <- {
+  split(leg, leg$asym) ->.;
+  lapply(., function(x) {
+    cat("fetching ", x$areasymbol, "\n")
+    temp = fetchSDA_spatial(x$areasymbol, geom.src = "sapolygon")
+    temp = sf::st_as_sf(temp)
+  }) ->.;
+}
+# saveRDS(sapol, file = "sapol_oconus.rds")
+sapol <- readRDS("sapol_oconus.rds")
+
+sapol_bndy <- lapply(sapol, function(x) {
+  x$asym = substr(x$areasymbol, 1, 2)
+  # if (asym == "AK") {
+  #   split(x, x$areasymbol) ->.;
+  #   lapply(., function(x) {
+  #     test = as.data.frame(st_coordinates(x))
+  #     x$test = any(test$X > 0)
+  #     return(x)
+  #     }) ->.;
+  #   do.call("rbind", .) ->.;
+  # }
+  x$asym = ifelse(x$areasymbol %in% paste0("AK", 783:788), "AK2", x$asym)
+  temp = ms_simplify(x) %>%
+    ms_dissolve(field = "asym") %>%
+    ms_explode()
+  return(temp)
+})
+
+sapol_bufbox <- {
+  do.call("rbind", sapol_bndy) ->.;
+  split(., .$asym) ->.;
+  lapply(., function(x) {
+    temp <- x %>%
+      st_transform(crs = 6933) %>%
+      st_buffer(dist = 1000 * if(all(x$asym == "AK2")) 10 else 10) %>%
+      st_transform(crs = 4326) %>%
+      st_bbox() %>%
+      st_as_sfc() %>%
+      st_as_sf()
+    temp$asym <- unique(x$asym)
+    return(temp)
+  }) -> .;
+}
+test <- sapol_bufbox$PR
+mapview::mapview(test)
+
+lapply(sapol_bufbox, function(x) write_sf(x, dsn = paste0("AOI_OCONUS_", x$asym, "_bufbox.shp")))
+lapply(sapol_bndy, function(x) write_sf(x, dsn = paste0("OCONUS_", x$asym, "_boundry.shp")))
+
+
+
 # GSOC ----
 aoi <- read_sf(dsn = "AOI_CONUS_bufbox.shp")
 gsoc <- raster("D:/geodata/soils/GSOCmap1.5.0.tif")
@@ -16,6 +94,7 @@ cms_soc <- raster("D:/geodata/soils/CMS_SOC_Mexico_CONUS_1737/data/SOC_predictio
 cms_soc_1km <- aggregate(cms_soc, fact = 4, fun = mean, progress = "text")
 cms_soc_1km <- readAll(cms_soc_1km)
 cms_soc_1km <- projectRaster(from = cms_soc_1km, to = ssurgo_st, filename = "cms_soc_1km.tif", method = "bilinear", progress = "text", overwrite = TRUE)
+
 
 
 # clay ----
@@ -314,10 +393,19 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           COV  = "CONUS_Cov_stack_AOI.tif"
 )
 fs_rs <- stack(vars)
-# writeRaster(Stack_Set_AR, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
+# writeRaster(fs_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
 
 
 
 
+# Define Target Points ----
+pts <- raster("CONUS_glc_shv10_DOM.tif")
+pts <- rasterToPoints(pts, spatial = TRUE)
+
+pts$CONUS_glc_shv10_DOM <- as.character(pts$CONUS_glc_shv10_DOM)
+pts <- subset(pts, CONUS_glc_shv10_DOM %in% c(2, 3, 5, 12))
+table(pts$CONUS_glc_shv10_DOM)
+
+pts <- as(pts, 'SpatialPoints')
 
 
