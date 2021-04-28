@@ -26,7 +26,10 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 
 # Stack_Set_1 is a stack that contains the spatial variables 
 su_pts <- readRDS(file = "su_pts.RDS")
-Vector_variables <- as.data.frame(su_pts)
+su_df <- as.data.frame(su_pts)
+su_df <- su_df[complete.cases(su_df), ]
+su_df <- cbind(1:nrow(su_df), su_df)
+Vector_variables <- su_df
 
 
 # Vector must be an empty points vector. 
@@ -106,7 +109,7 @@ Roth_C <-
                                                                     Acc.TSMD) /
                                                                    (Max.TSMD - 0.444 * Max.TSMD)
         )))
-        b <- clamp(b, lower = 0.2)
+        b <- raster::clamp(b, lower = 0.2)
         return(data.frame(b))
       }
     
