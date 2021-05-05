@@ -1,4 +1,3 @@
-#12/11/2020
 
 # SPATIAL SOIL R  for VECTORS
 
@@ -29,17 +28,20 @@ su_df  <- as.data.frame(su_sdf)
 su_df  <- su_df[complete.cases(su_df), ]
 su_df  <- cbind(ID = 1:nrow(su_df), su_df)
 
+
 # Vector must be an empty points vector. 
 su_pts <- as(su_sdf, "SpatialPoints")
 
 
-# Create A vector to save the results
-C_INPUT_EQ <- su_pts
-
-
 # Extract the layers from the Vector
-SOC  <- su_df$SOC  # primera banda del stack
-pClay <- su_df$CLAY # segunda banda del stack
+SOC_r    <- su_df$SOC
+SOC_min  <- su_df$SOC * 0.8
+SOC_max  <- su_df$SOC * 1.2
+
+pClay_r   <- su_df$CLAY
+pClay_min <- su_df$CLAY * 0.9
+pClay_max <- su_df$CLAY * 1.1
+
 DR   <- su_df$DR
 LU   <- su_df$LU
 TEMP <- su_df[grepl("^TEMP_", names(su_df))]
@@ -48,118 +50,94 @@ PET  <- su_df[grepl("^PET_",  names(su_df))]
 COV  <- su_df[grepl("^COV_",  names(su_df))]
 
 
-# Define Years for Cinputs calculations
+# Define Years for Cinputs calculations ----
 years <- seq(1 / 12, 500, by = 1 / 12)
 
 
-# ROTH C MODEL FUNCTION .
-########## function set up starts###############
-# Roth_C <-
-#   function(Cinputs,
-#            years,
-#            DPMptf,
-#            RPMptf,
-#            BIOptf,
-#            HUMptf,
-#            FallIOM,
-#            Temp,
-#            Precip,
-#            Evp,
-#            Cov,
-#            Cov1,
-#            Cov2,
-#            soil.thick,
-#            SOC,
-#            clay,
-#            DR,
-#            bare1,
-#            LU
-#            ) {
-# Paddy fields coefficent fPR = 0.4 if the target point is class = 13 , else fPR=1
+# Paddy fields coefficent  ----
+# fPR = 0.4 if the target point is class = 13 , else fPR=1
 # From Shirato and Yukozawa 2004
 fPR <- (LU == 13) * 0.4 + (LU != 13) * 1
 
 
-# Temperature effects per month
+# Temperature effects per month ----
 fT <- as.data.frame(lapply(TEMP, function(x) fT.RothC(x)))
 
     
-# Moisture effects per month
-    # fw1func <- function(
-    #   P,                  # precip
-    #   E,                  # PET
-    #   S.Thick = 30,
-    #   pClay   = 32.0213,
-    #   pE      = 1,
-    #   bare                # COV
-    #   ) # {
+# Moisture effects per month ----
 
-s_thk <- 30
-pE    <- 1
-M     <- PREC - PET * pE
-bare  <- as.data.frame(lapply(COV, function(x) x > 0.8))
-
-B <- as.data.frame(lapply(bare, function(x) ifelse(x == FALSE, 1, 1.8)))
-Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23)
-Max.TSMD <- as.data.frame(lapply(1 / B, function(x) x * Max.TSMD))
-
-Acc.TSMD <- M
-Acc.TSMD[, 1] <- ifelse(M[, 1] > 0, 0, M[, 1])
-
-for (i in 2:ncol(M)) {
+fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
   
-  Acc.TSMD_i <- Acc.TSMD[, i - 1] + M[, i]
-  Acc.TSMD[, i] <- ifelse(
-    Acc.TSMD_i < 0,
-    Acc.TSMD_i,
-    0
-    )
-  Acc.TSMD[, i] <- ifelse(
-    Acc.TSMD[, i] <= Max.TSMD[, i],
-    Max.TSMD[, i],
-    Acc.TSMD[, i]
-  )
-}
-
-
-fW_2 <- Acc.TSMD
-
-for (i in 1:ncol(fW_2)) {
-  fW_2[, i] <- ifelse(
-    Acc.TSMD[, i] > 0.444 * Max.TSMD[, i], 
-    1, 
-    (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i]) / (Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
-    )
-  fW_2[, i] <- raster::clamp(fW_2[, i], lower = 0.2)
-}
+  M     <- PREC - PET * pE
+  bare  <- as.data.frame(lapply(COV, function(x) x > 0.8))
+  
+  B <- as.data.frame(lapply(bare, function(x) ifelse(x == FALSE, 1, 1.8)))
+  Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23)
+  Max.TSMD <- as.data.frame(lapply(1 / B, function(x) x * Max.TSMD))
+  
+  Acc.TSMD <- M
+  Acc.TSMD[, 1] <- ifelse(M[, 1] > 0, 0, M[, 1])
+  
+  for (i in 2:ncol(M)) {
+    Acc.TSMD_i <- Acc.TSMD[, i - 1] + M[, i]
+    Acc.TSMD[, i] <- ifelse(
+      Acc.TSMD_i < 0,
+      Acc.TSMD_i,
+      0
+      )
+    Acc.TSMD[, i] <- ifelse(
+      Acc.TSMD[, i] <= Max.TSMD[, i],
+      Max.TSMD[, i],
+      Acc.TSMD[, i]
+      )
+  }
+   
+  fW <- Acc.TSMD
     
-    # fW_2 <-
-    #   fw1func(
-    #     P = (Precip[, 2]),
-    #     E = (Evp[, 2]),
-    #     S.Thick = soil.thick,
-    #     pClay = clay,
-    #     pE = 1,
-    #     bare = bare1
-    #   )$b
+  for (i in 1:ncol(fW)) {
+    fW[, i] <- ifelse(
+      Acc.TSMD[, i] > 0.444 * Max.TSMD[, i], 
+      1, 
+      (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i]) / (Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
+      )
+    fW[, i] <- raster::clamp(fW[, i], lower = 0.2)
+    }
     
+  return(fW)
+  }
+
+fW_r   <- fW(pClay_r,   PREC, PET, COV, s_thk = 30, pE = 1)
+fW_min <- fW(pClay_min, PREC, PET, COV, s_thk = 30, pE = 1)
+fW_max <- fW(pClay_max, PREC, PET, COV, s_thk = 30, pE = 1)
+
     
-# Vegetation Cover effects
+# Vegetation Cover effects ----
 fC <- COV
     
 
-# Set the factors frame for Model calculations
-# xi.frame <- data.frame(years, rep(fT * fW_2 * fC * fPR, length.out = length(years)))
-    
-xi <- fT
+# Set the factors frame for Model calculations ----
+xi_r   <- fT
+xi_min <- fT
+xi_max <- fT
 
 for (i in 1:ncol(fT)) {
-  xi[, i] <- fT[, i] * fW_2[, i] * fC[, i] * fPR
+  xi_r[, i] <- fT[, i] * fW_r[, i] * fC[, i] * fPR
+}
+for (i in 1:ncol(fT)) {
+  xi_min[, i] <- fT[, i] * fW_min[, i] * fC[, i] * fPR
+}
+for (i in 1:ncol(fT)) {
+  xi_max[, i] <- fT[, i] * fW_max[, i] * fC[, i] * fPR
 }
 
-    
-# IOM using Falloon method
-FallIOM <- 0.049 * SOC^1.139
+
+# IOM using Falloon method ----
+FallIOM_r   <- 0.049 * SOC^1.139
+FallIOM_min <- 0.049 * SOC_min^1.139 
+FallIOM_max <- 0.049 * SOC_max^1.139
+
+
+# Roth C inputs ----
 DPMptf  <- 0
 RPMptf  <- 0
 BIOptf  <- 0
@@ -167,167 +145,136 @@ HUMptf  <- 0
 Cinputs <- 1
 
 
-ri <- data.frame(id = as.integer(1:nrow(xi)), iter = as.character(rep(1:16, length.out= nrow(xi))), FallIOM, DR, pClay, xi)
-ro <- list(data.frame(id = NULL, C1 = NULL, C2 = NULL, C3 = NULL, C4 = NULL, C5 = NULL))[rep(1, nrow(ri))]
-iter <- as.integer(seq(200, nrow(ri), 200))
+ri_r <- data.frame(
+  id = as.integer(1:nrow(xi)), 
+  iter = as.character(rep(1:16, length.out= nrow(xi))), 
+  FallIOM_r, DR, pClay_r, xi_r
+  )
 
-for (i in 1:nrow(ri)) {
-    
-    if (any(i %in% iter)) cat("iteration", i, as.character(Sys.time()), "\n")
-    
-    temp <- carbonTurnover(
-      tt   = years,
-      C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, ri[i, 3]),
-      In   = Cinputs,
-      Dr   = ri[i, 4],
-      clay = ri[i, 5],
-      effcts = data.frame(years, rep(unlist(ri[i, 5:16]), length.out = length(years))),
-      solver = "euler"
-      )
-    ro[[i]] <- c(ri[1], unlist(temp[6000, 2:6]))
-  }
+ri_min <- data.frame(
+  id = as.integer(1:nrow(xi)), 
+  iter = as.character(rep(1:16, length.out= nrow(xi))), 
+  FallIOM_min, DR, pClay_min, xi_min
+)
+
+ri_max <- data.frame(
+  id = as.integer(1:nrow(xi)), 
+  iter = as.character(rep(1:16, length.out= nrow(xi))), 
+  FallIOM_min, DR, pClay_max, xi
+)
+
+# # Roth C outputs
+# ro <- list(data.frame(id = NULL, C1 = NULL, C2 = NULL, C3 = NULL, C4 = NULL, C5 = NULL))[rep(1, nrow(ri))]
+# 
+# # RUN THE MODEL from soilassessment
+# # Roth C soilassesment
+# 
+# iter <- as.integer(seq(200, nrow(ri), 200))
+# for (i in 1:nrow(ri)) {
+#    if (any(i %in% iter)) cat("iteration", i, as.character(Sys.time()), "\n")
+#   temp <- carbonTurnover(
+#     tt   = years,
+#     C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, ri[i, 3]),
+#     In   = Cinputs,
+#     Dr   = ri[i, 4],
+#     clay = ri[i, 5],
+#     effcts = data.frame(years, rep(unlist(ri[i, 5:16]), length.out = length(years))),
+#     solver = "euler"
+#     )
+#  ro[[i]] <- c(ri[1], unlist(temp[6000, 2:6]))
+# }
 
 
-library(snow)
+# RUN THE MODEL from soilassessment ----
+# Roth C soilassesment in parallel
+
+library(parallel)
 
 clus <- makeCluster(15)
 
-clusterExport(clus, list("ri", "years", "DPMptf", "RPMptf", "BIOptf", "HUMptf", "Cinputs", "carbonTurnover", "rothC"))
+clusterExport(clus, list("ri_r", "years", "DPMptf", "RPMptf", "BIOptf", "HUMptf", "Cinputs", "carbonTurnover")) # , "rothC"))
 
-rothC_l <- parLapply(clus, 1:nrow(ri), function(i) {
+
+# C input equilibrium. (Ceq) ----
+Sys.time()
+rothC_r <- parLapply(clus, 1:200, function(i) {
   
   temp <- carbonTurnover(
     tt   = years,
-    C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, ri[i, 3]),
+    C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, ri_r[i, 3]),
     In   = Cinputs,
-    Dr   = ri[i, 4],
-    clay = ri[i, 5],
-    effcts = data.frame(years, rep(unlist(ri[i, 6:17]), length.out = length(years))),
+    Dr   = ri_r[i, 4],
+    clay = ri_r[i, 5],
+    effcts = data.frame(years, rep(unlist(ri_r[i, 6:17]), length.out = length(years))),
     solver = "euler"
   )
-  temp <- c(ri[i, 1], unlist(temp[6000, 2:6]))
+  temp <- c(ri_r[i, 1], unlist(temp[6000, 2:6]))
   
   return(temp)
 })
+Sys.time()
+# saveRDS(rothC_r, file = "rothC_r.rds")
+stopCluster(clus)
 
 
-# RUN THE MODEL from soilassessment
-# Roth C soilassesment
-Model3_spin <- carbonTurnover(
-  tt   = years,
-  C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, FallIOM[1]),
-  In   = Cinputs,
-  Dr   = DR[1],
-  clay = pClay[1],
-  effcts = data.frame(years, rep(t(xi[1, ]), length.out = length(years))),
-  solver = "euler"
-)
-Ct3_spin <- Model3_spin[, 2:6]
-    
-    
-    # RUN THE MODEL FROM SOILR
-    #Model3_spin=RothCModel(t=years,C0=c(DPMptf, RPMptf, BIOptf, HUMptf, FallIOM),In=Cinputs,DR=DR,clay=clay,xi=xi.frame, pass=TRUE)
-    #Ct3_spin=getC(Model3_spin)
-    
-    # Get the final pools of the time series
-    poolSize3_spin = as.numeric(tail(Ct3_spin, 1))
-    
-    return(poolSize3_spin)
-  }
-########## function set up ends###############
+# UNCERTAINTIES C input equilibrium (MINIMUM)
+clusterExport(clus, list("ri_min", "years", "DPMptf", "RPMptf", "BIOptf", "HUMptf", "Cinputs", "carbonTurnover"))
 
-# Iterates over the area of interest
+Sys.time()
+rothC_min <- parLapply(clus, 1:nrow(ri_min), function(i) {
+  
+  temp <- carbonTurnover(
+    tt   = years,
+    C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, ri_min[i, 3]),
+    In   = Cinputs,
+    Dr   = ri_min[i, 4],
+    clay = ri_min[i, 5],
+    effcts = data.frame(years, rep(unlist(ri_min[i, 6:17]), length.out = length(years))),
+    solver = "euler"
+  )
+  temp <- c(ri_min[i, 1], unlist(temp[6000, 2:6]))
+  
+  return(temp)
+})
+Sys.time()
+saveRDS(rothC_min, file = "rothC_min.rds")
+stopCluster(clus)
 
-########for loop starts###############3
-for (i in 1:nrow(Vector_variables)) {
-  # Extract the variables
+
+# UNCERTAINTIES C input equilibrium (MAXIMUM)
+clusterExport(clus, list("ri_max", "years", "DPMptf", "RPMptf", "BIOptf", "HUMptf", "Cinputs", "carbonTurnover"))
+
+Sys.time()
+rothC_max <- parLapply(clus, 1:nrow(ri_max), function(i) {
   
-  Vect <- Vector_variables[i, ]
+  temp <- carbonTurnover(
+    tt   = years,
+    C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, ri_max[i, 3]),
+    In   = Cinputs,
+    Dr   = ri_max[i, 4],
+    clay = ri_max[i, 5],
+    effcts = data.frame(years, rep(unlist(ri_max[i, 6:17]), length.out = length(years))),
+    solver = "euler"
+  )
+  temp <- c(ri_max[i, 1], unlist(temp[6000, 2:6]))
   
-  Temp <- t(Vect[4:15])
-  Temp <- cbind(Month = 1:12, Temp = Temp[, 1])
-  
-  Precip <- t(Vect[16:27])
-  Precip <- cbind(Month = 1:12, Precip = Precip[, 1])
-  
-  Evp <- t(Vect[28:39])
-  Evp <- cbind(Month = 1:12, Evp = Evp[, 1])
-  
-  Cov <-  t(Vect[42:53])
-  Cov1 <- Cov[, 1]
-  Cov2 <- cbind(Month = 1:12, Cov = Cov[, 1])
-  
-  # Avoid calculus over Na values
-  if (any(is.na(Evp[, 2])) |
-      any(is.na(Temp[, 2])) |
-      any(is.na(SOC_im[i])) |
-      any(is.na(clay_im[i])) |
-      any(is.na(Precip[, 2]))  |
-      any(is.na(Cov2[, 2]))  |
-      any(is.na(Cov1[, 1]))  |
-      any(is.na(DR_im[i])) |
-      (SOC_im[i] < 0) | (clay_im[i] < 0)) {
-    C_INPUT_EQ[i, 2] <- 0
-  } else{
-    # Set the variables from the images
-    
-    soil.thick = 30    # Soil thickness (organic layer topsoil), in cm
-    SOC  <- SOC_im[i]  # Soil organic carbon in Mg/ha
-    clay <- clay_im[i] # Percent clay %
-    
-    DR    <-  DR_im[i]    # DPM/RPM (decomposable vs resistant plant material.)
-    bare1 <- (Cov1 > 0.8) # If the surface is bare or vegetated
-    LU    <- LU_im[i]
-    
-    
-    # IOM using Falloon method
-    FallIOM = 0.049 * SOC^1.139
-    
-    
-    # If you use a SOC uncertainty layer turn on this. First open the layer SOC_UNC
-    #(it must have the same extent and resolution of the SOC layer)
-    
-    #SOC_min<-(1-(SOC_UNC/100))*SOC
-    #SOC_max<-(1+(SOC_UNC/100))*SOC
-    
-    
-    # Define SOC min, max Clay min and max.
-    SOC_min  <- SOC * 0.8
-    SOC_max  <- SOC * 1.2
-    clay_min <- clay * 0.9
-    clay_max <- clay * 1.1
-    
-    b <- 1
-    
-    # C input equilibrium. (Ceq)
-    fb <-
-      Roth_C(
-        Cinputs = b,
-        years   = years,
-        DPMptf  = 0,
-        RPMptf  = 0,
-        BIOptf  = 0,
-        HUMptf  = 0,
-        FallIOM = FallIOM,
-        Temp    = Temp,
-        Precip  = Precip,
-        Evp     = Evp,
-        Cov     = Cov,
-        Cov1    = Cov1,
-        Cov2    = Cov2,
-        soil.thick = soil.thick,
-        SOC     = SOC,
-        clay    = clay,
-        DR      = DR,
-        bare1   = bare1,
-        LU      = LU
-      )
-    fb_t <- fb[1] + fb[2] + fb[3] + fb[4] + fb[5]
-    
-    m <- (fb_t - FallIOM) / (b)
-    
-    Ceq <- (SOC - FallIOM) / m
-    
+  return(temp)
+})
+Sys.time()
+saveRDS(rothC_max, file = "rothC_max.rds")
+stopCluster(clus)
+
+
+
+
+rothC_r2 <- readRDS("rothC_l.rds")
+rothC_df <- as.data.frame(do.call("rbind", rothC_r))
+rothC_df$fb_t <- rowSums(rothC_df[2:6], na.rm = TRUE)
+m <- (rothC_df$fb_t - FallIOM[1:200]) / b
+rothC_df$Ceq <- (SOC[1:200] - FallIOM[1:200]) / m
+
+
+
     
     # UNCERTAINTIES C input equilibrium (MINIMUM)
     FallIOM_min = 0.049 * SOC_min ^ (1.139)
