@@ -29,10 +29,6 @@ su_df  <- su_df[complete.cases(su_df), ]
 su_df  <- cbind(ID = 1:nrow(su_df), su_df)
 
 
-# Vector must be an empty points vector. 
-su_pts <- as(su_sdf, "SpatialPoints")
-
-
 # Extract the layers from the Vector
 SOC_r    <- su_df$SOC
 SOC_min  <- su_df$SOC * 0.8
@@ -65,7 +61,6 @@ fT <- as.data.frame(lapply(TEMP, function(x) fT.RothC(x)))
 
     
 # Moisture effects per month ----
-
 fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
   
   M     <- PREC - PET * pE
@@ -132,7 +127,7 @@ for (i in 1:ncol(fT)) {
 
 
 # IOM using Falloon method ----
-FallIOM_r   <- 0.049 * SOC^1.139
+FallIOM_r   <- 0.049 * SOC_r^1.139
 FallIOM_min <- 0.049 * SOC_min^1.139 
 FallIOM_max <- 0.049 * SOC_max^1.139
 
@@ -146,21 +141,21 @@ Cinputs <- 1
 
 
 ri_r <- data.frame(
-  id = as.integer(1:nrow(xi)), 
-  iter = as.character(rep(1:16, length.out= nrow(xi))), 
+  id = as.integer(1:nrow(xi_r)), 
+  iter = as.character(rep(1:16, length.out= nrow(xi_r))), 
   FallIOM_r, DR, pClay_r, xi_r
   )
 
 ri_min <- data.frame(
-  id = as.integer(1:nrow(xi)), 
-  iter = as.character(rep(1:16, length.out= nrow(xi))), 
+  id = as.integer(1:nrow(xi_min)), 
+  iter = as.character(rep(1:16, length.out= nrow(xi_min))), 
   FallIOM_min, DR, pClay_min, xi_min
 )
 
 ri_max <- data.frame(
-  id = as.integer(1:nrow(xi)), 
-  iter = as.character(rep(1:16, length.out= nrow(xi))), 
-  FallIOM_min, DR, pClay_max, xi
+  id = as.integer(1:nrow(xi_max)), 
+  iter = as.character(rep(1:16, length.out= nrow(xi_max))), 
+  FallIOM_max, DR, pClay_max, xi_max
 )
 
 # # Roth C outputs
@@ -192,10 +187,10 @@ library(parallel)
 
 clus <- makeCluster(15)
 
-clusterExport(clus, list("ri_r", "years", "DPMptf", "RPMptf", "BIOptf", "HUMptf", "Cinputs", "carbonTurnover")) # , "rothC"))
-
 
 # C input equilibrium. (Ceq) ----
+clusterExport(clus, list("ri_r", "years", "DPMptf", "RPMptf", "BIOptf", "HUMptf", "Cinputs", "carbonTurnover")) # , "rothC"))
+
 Sys.time()
 rothC_r <- parLapply(clus, 1:200, function(i) {
   
@@ -237,7 +232,7 @@ rothC_min <- parLapply(clus, 1:nrow(ri_min), function(i) {
   return(temp)
 })
 Sys.time()
-saveRDS(rothC_min, file = "rothC_min.rds")
+# saveRDS(rothC_min, file = "rothC_min.rds")
 stopCluster(clus)
 
 
@@ -261,320 +256,84 @@ rothC_max <- parLapply(clus, 1:nrow(ri_max), function(i) {
   return(temp)
 })
 Sys.time()
-saveRDS(rothC_max, file = "rothC_max.rds")
+# saveRDS(rothC_max, file = "rothC_max.rds")
 stopCluster(clus)
 
 
 
 
-rothC_r2 <- readRDS("rothC_l.rds")
-rothC_df <- as.data.frame(do.call("rbind", rothC_r))
-rothC_df$fb_t <- rowSums(rothC_df[2:6], na.rm = TRUE)
-m <- (rothC_df$fb_t - FallIOM[1:200]) / b
-rothC_df$Ceq <- (SOC[1:200] - FallIOM[1:200]) / m
+rothC_r <- as.data.frame(
+  cbind(su_df[c("ID", "x", "y")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r, LU,
+        source = "r",
+  do.call(
+    "rbind", 
+    readRDS("rothC_r.rds")
+    )))
+
+rothC_min <- as.data.frame(
+  cbind(su_df[c("ID", "x", "y")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, LU, 
+        source = "min",
+  do.call(
+    "rbind", 
+    readRDS("rothC_min.rds")
+  )))
+
+rothC_max <- as.data.frame(
+  cbind(su_df[c("ID", "x", "y")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, LU, 
+        source = "max",
+  do.call(
+    "rbind", 
+    readRDS("rothC_max.rds")
+  )))
+
+rothC_df <- rbind(rothC_r, rothC_min, rothC_max)
+
+rothC_df <- within(rothC_df, {
+  fb_t = C1 + C2 + C3 + C4 + C5
+  m    = (fb_t - FallIOM) / 1
+  Ceq  = (SOC  - FallIOM) / m
+})
 
 
+# crops, tree crops, and rice
+idx <- ifelse(rothC_r$LU %in% c(2, 12, 13), TRUE, FALSE)
+rothC_crops <- within(rothC_df[idx, ], {
+  RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 0.9902 +
+    0.4788
+  BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 1.09038 +
+    0.04055
+  HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.9878 -
+    0.3818
+  DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
+  feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
+})
 
-    
-    # UNCERTAINTIES C input equilibrium (MINIMUM)
-    FallIOM_min = 0.049 * SOC_min ^ (1.139)
-    
-    fb_min <-
-      Roth_C(
-        Cinputs = b,
-        years = years,
-        DPMptf = 0,
-        RPMptf = 0,
-        BIOptf = 0,
-        HUMptf = 0,
-        FallIOM = FallIOM,
-        Temp = Temp * 1.02,
-        Precip = Precip * 0.95,
-        Evp = Evp,
-        Cov = Cov,
-        Cov1 = Cov1,
-        Cov2 = Cov2,
-        soil.thick = soil.thick,
-        SOC = SOC_min,
-        clay = clay_min,
-        DR = DR,
-        bare1 = bare1,
-        LU = LU
-      )
-    fb_t_MIN <- fb_min[1] + fb_min[2] + fb_min[3] + fb_min[4] + fb_min[5]
-    
-    m <- (fb_t_MIN - FallIOM_min) / (b)
-    
-    Ceq_MIN <- (SOC_min - FallIOM_min) / m
-    
-    # UNCERTAINTIES C input equilibrium (MAXIMUM)
-    FallIOM_max = 0.049 * SOC_max ^ (1.139)
-    
-    fb_max <-
-      Roth_C(
-        Cinputs = b,
-        years = years,
-        DPMptf = 0,
-        RPMptf = 0,
-        BIOptf = 0,
-        HUMptf = 0,
-        FallIOM = FallIOM,
-        Temp = Temp * 0.98,
-        Precip = Precip * 1.05,
-        Evp = Evp,
-        Cov = Cov,
-        Cov1 = Cov1,
-        Cov2 = Cov2,
-        soil.thick = soil.thick,
-        SOC = SOC_max,
-        clay = clay_max,
-        DR = DR,
-        bare1 = bare1,
-        LU = LU
-      )
-    fb_t_MAX <- fb_max[1] + fb_max[2] + fb_max[3] + fb_max[4] + fb_max[5]
-    
-    m <- (fb_t_MAX - FallIOM_max) / (b)
-    
-    Ceq_MAX <- (SOC_max - FallIOM_max) / m
-    
-    # SOC POOLS AFTER 500 YEARS RUN WITH C INPUT EQUILIBRIUM
-    
-    if (LU == 2 | LU == 12 | LU == 13) {
-      RPM_p_2 <-
-        ((0.184 * SOC + 0.1555) * (clay + 1.275) ^ (-0.1158)) * 0.9902 + 0.4788
-      BIO_p_2 <-
-        ((0.014 * SOC + 0.0075) * (clay + 8.8473) ^ (0.0567)) * 1.09038 + 0.04055
-      HUM_p_2 <-
-        ((0.7148 * SOC + 0.5069) * (clay + 0.3421) ^ (0.0184)) * 0.9878 - 0.3818
-      DPM_p_2 <- SOC - FallIOM - RPM_p_2 - HUM_p_2 - BIO_p_2
-      
-      feq_t <- RPM_p_2 + BIO_p_2 + HUM_p_2 + DPM_p_2 + FallIOM
-      
-      #uncertainties  MIN
-      
-      RPM_p_2_min <-
-        ((0.184 * SOC_min + 0.1555) * (clay_min + 1.275) ^ (-0.1158)) * 0.9902 +
-        0.4788
-      BIO_p_2_min <-
-        ((0.014 * SOC_min + 0.0075) * (clay_min + 8.8473) ^ (0.0567)) * 1.09038 +
-        0.04055
-      HUM_p_2_min <-
-        ((0.7148 * SOC_min + 0.5069) * (clay_min + 0.3421) ^ (0.0184)) * 0.9878 -
-        0.3818
-      DPM_p_2_min <-
-        SOC_min - FallIOM_min - RPM_p_2_min - HUM_p_2_min - BIO_p_2_min
-      
-      feq_t_min <-
-        RPM_p_2_min + BIO_p_2_min + HUM_p_2_min + DPM_p_2_min + FallIOM_min
-      
-      #uncertainties  MAX
-      
-      RPM_p_2_max <-
-        ((0.184 * SOC_max + 0.1555) * (clay_max + 1.275) ^ (-0.1158)) * 0.9902 +
-        0.4788
-      BIO_p_2_max <-
-        ((0.014 * SOC_max + 0.0075) * (clay_max + 8.8473) ^ (0.0567)) * 1.09038 +
-        0.04055
-      HUM_p_2_max <-
-        ((0.7148 * SOC_max + 0.5069) * (clay_max + 0.3421) ^ (0.0184)) * 0.9878 -
-        0.3818
-      DPM_p_2_max <-
-        SOC_max - FallIOM_max - RPM_p_2_max - HUM_p_2_max - BIO_p_2_max
-      
-      feq_t_max <-
-        RPM_p_2_max + BIO_p_2_max + HUM_p_2_max + DPM_p_2_max + FallIOM_max
-      
-      C_INPUT_EQ[i, 2] <- SOC
-      C_INPUT_EQ[i, 3] <- Ceq
-      C_INPUT_EQ[i, 4] <- feq_t
-      C_INPUT_EQ[i, 5] <- DPM_p_2
-      C_INPUT_EQ[i, 6] <- RPM_p_2
-      C_INPUT_EQ[i, 7] <- BIO_p_2
-      C_INPUT_EQ[i, 8] <- HUM_p_2
-      C_INPUT_EQ[i, 9] <- FallIOM
-      C_INPUT_EQ[i, 10] <- Ceq_MIN
-      C_INPUT_EQ[i, 11] <- Ceq_MAX
-      C_INPUT_EQ[i, 12] <- feq_t_min
-      C_INPUT_EQ[i, 13] <- DPM_p_2_min
-      C_INPUT_EQ[i, 14] <- RPM_p_2_min
-      C_INPUT_EQ[i, 15] <- BIO_p_2_min
-      C_INPUT_EQ[i, 16] <- HUM_p_2_min
-      C_INPUT_EQ[i, 17] <- FallIOM_min
-      C_INPUT_EQ[i, 18] <- feq_t_max
-      C_INPUT_EQ[i, 19] <- DPM_p_2_max
-      C_INPUT_EQ[i, 20] <- RPM_p_2_max
-      C_INPUT_EQ[i, 21] <- BIO_p_2_max
-      C_INPUT_EQ[i, 22] <- HUM_p_2_max
-      C_INPUT_EQ[i, 23] <- FallIOM_max
-      
-    } else if (LU == 4) {
-      RPM_p_4 <-
-        ((0.184 * SOC + 0.1555) * (clay + 1.275) ^ (-0.1158)) * 1.7631 + 0.4043
-      BIO_p_4 <-
-        ((0.014 * SOC + 0.0075) * (clay + 8.8473) ^ (0.0567)) * 0.9757 + 0.0209
-      HUM_p_4 <-
-        ((0.7148 * SOC + 0.5069) * (clay + 0.3421) ^ (0.0184)) * 0.8712 - 0.2904
-      DPM_p_4 <- SOC - FallIOM - RPM_p_4 - HUM_p_4 - BIO_p_4
-      
-      feq_t <- RPM_p_4 + BIO_p_4 + HUM_p_4 + DPM_p_4 + FallIOM
-      
-      #uncertainties min
-      
-      RPM_p_4_min <-
-        ((0.184 * SOC_min + 0.1555) * (clay_min + 1.275) ^ (-0.1158)) * 1.7631 +
-        0.4043
-      BIO_p_4_min <-
-        ((0.014 * SOC_min + 0.0075) * (clay_min + 8.8473) ^ (0.0567)) * 0.9757 +
-        0.0209
-      HUM_p_4_min <-
-        ((0.7148 * SOC_min + 0.5069) * (clay_min + 0.3421) ^ (0.0184)) * 0.8712 -
-        0.2904
-      DPM_p_4_min <-
-        SOC_min - FallIOM_min - RPM_p_4_min - HUM_p_4_min - BIO_p_4_min
-      
-      feq_t_min <-
-        RPM_p_4_min + BIO_p_4_min + HUM_p_4_min + DPM_p_4_min + FallIOM_min
-      
-      #uncertainties max
-      
-      RPM_p_4_max <-
-        ((0.184 * SOC_max + 0.1555) * (clay_max + 1.275) ^ (-0.1158)) * 1.7631 +
-        0.4043
-      BIO_p_4_max <-
-        ((0.014 * SOC_max + 0.0075) * (clay_max + 8.8473) ^ (0.0567)) * 0.9757 +
-        0.0209
-      HUM_p_4_max <-
-        ((0.7148 * SOC_max + 0.5069) * (clay_max + 0.3421) ^ (0.0184)) * 0.8712 -
-        0.2904
-      DPM_p_4_max <-
-        SOC_max - FallIOM_max - RPM_p_4_max - HUM_p_4_max - BIO_p_4_max
-      
-      feq_t_max <-
-        RPM_p_4_max + BIO_p_4_max + HUM_p_4_max + DPM_p_4_max + FallIOM_max
-      
-      C_INPUT_EQ[i, 2] <- SOC
-      C_INPUT_EQ[i, 3] <- Ceq
-      C_INPUT_EQ[i, 4] <- feq_t
-      C_INPUT_EQ[i, 5] <- DPM_p_4
-      C_INPUT_EQ[i, 6] <- RPM_p_4
-      C_INPUT_EQ[i, 7] <- BIO_p_4
-      C_INPUT_EQ[i, 8] <- HUM_p_4
-      C_INPUT_EQ[i, 9] <- FallIOM
-      C_INPUT_EQ[i, 10] <- Ceq_MIN
-      C_INPUT_EQ[i, 11] <- Ceq_MAX
-      C_INPUT_EQ[i, 12] <- feq_t_min
-      C_INPUT_EQ[i, 13] <- DPM_p_4_min
-      C_INPUT_EQ[i, 14] <- RPM_p_4_min
-      C_INPUT_EQ[i, 15] <- BIO_p_4_min
-      C_INPUT_EQ[i, 16] <- HUM_p_4_min
-      C_INPUT_EQ[i, 17] <- FallIOM_min
-      C_INPUT_EQ[i, 18] <- feq_t_max
-      C_INPUT_EQ[i, 19] <- DPM_p_4_max
-      C_INPUT_EQ[i, 20] <- RPM_p_4_max
-      C_INPUT_EQ[i, 21] <- BIO_p_4_max
-      C_INPUT_EQ[i, 22] <- HUM_p_4_max
-      C_INPUT_EQ[i, 23] <- FallIOM_max
-      
-    } else if (LU == 3 | LU == 5 | LU == 6 | LU == 8) {
-      RPM_p_3 <-
-        ((0.184 * SOC + 0.1555) * (clay + 1.275) ^ (-0.1158)) * 1.3837 + 0.4692
-      BIO_p_3 <-
-        ((0.014 * SOC + 0.0075) * (clay + 8.8473) ^ (0.0567)) * 1.03401 + 0.02531
-      HUM_p_3 <-
-        ((0.7148 * SOC + 0.5069) * (clay + 0.3421) ^ (0.0184)) * 0.9316 - 0.5243
-      DPM_p_3 <- SOC - FallIOM - RPM_p_3 - HUM_p_3 - BIO_p_3
-      
-      feq_t <- RPM_p_3 + BIO_p_3 + HUM_p_3 + DPM_p_3 + FallIOM
-      
-      #uncertainties min
-      
-      RPM_p_3_min <-
-        ((0.184 * SOC_min + 0.1555) * (clay_min + 1.275) ^ (-0.1158)) * 1.3837 +
-        0.4692
-      BIO_p_3_min <-
-        ((0.014 * SOC_min + 0.0075) * (clay_min + 8.8473) ^ (0.0567)) * 1.03401 +
-        0.02531
-      HUM_p_3_min <-
-        ((0.7148 * SOC_min + 0.5069) * (clay_min + 0.3421) ^ (0.0184)) * 0.9316 -
-        0.5243
-      DPM_p_3_min <-
-        SOC_min - FallIOM_min - RPM_p_3_min - HUM_p_3_min - BIO_p_3_min
-      
-      feq_t_min <-
-        RPM_p_3_min + BIO_p_3_min + HUM_p_3_min + DPM_p_3_min + FallIOM_min
-      
-      #uncertainties max
-      
-      RPM_p_3_max <-
-        ((0.184 * SOC_max + 0.1555) * (clay_max + 1.275) ^ (-0.1158)) * 1.3837 +
-        0.4692
-      BIO_p_3_max <-
-        ((0.014 * SOC_max + 0.0075) * (clay_max + 8.8473) ^ (0.0567)) * 1.03401 +
-        0.02531
-      HUM_p_3_max <-
-        ((0.7148 * SOC_max + 0.5069) * (clay_max + 0.3421) ^ (0.0184)) * 0.9316 -
-        0.5243
-      DPM_p_3_max <-
-        SOC_max - FallIOM_max - RPM_p_3_max - HUM_p_3_max - BIO_p_3_max
-      
-      feq_t_max <-
-        RPM_p_3_max + BIO_p_3_max + HUM_p_3_max + DPM_p_3_max + FallIOM_max
-      
-      
-      C_INPUT_EQ[i, 2] <- SOC
-      C_INPUT_EQ[i, 3] <- Ceq
-      C_INPUT_EQ[i, 4] <- feq_t
-      C_INPUT_EQ[i, 5] <- DPM_p_3
-      C_INPUT_EQ[i, 6] <- RPM_p_3
-      C_INPUT_EQ[i, 7] <- BIO_p_3
-      C_INPUT_EQ[i, 8] <- HUM_p_3
-      C_INPUT_EQ[i, 9] <- FallIOM
-      C_INPUT_EQ[i, 10] <- Ceq_MIN
-      C_INPUT_EQ[i, 11] <- Ceq_MAX
-      C_INPUT_EQ[i, 12] <- feq_t_min
-      C_INPUT_EQ[i, 13] <- DPM_p_3_min
-      C_INPUT_EQ[i, 14] <- RPM_p_3_min
-      C_INPUT_EQ[i, 15] <- BIO_p_3_min
-      C_INPUT_EQ[i, 16] <- HUM_p_3_min
-      C_INPUT_EQ[i, 17] <- FallIOM_min
-      C_INPUT_EQ[i, 18] <- feq_t_max
-      C_INPUT_EQ[i, 19] <- DPM_p_3_max
-      C_INPUT_EQ[i, 20] <- RPM_p_3_max
-      C_INPUT_EQ[i, 21] <- BIO_p_3_max
-      C_INPUT_EQ[i, 22] <- HUM_p_3_max
-      C_INPUT_EQ[i, 23] <- FallIOM_max
-      
-    } else {
-      C_INPUT_EQ[i, 2] <- SOC
-      C_INPUT_EQ[i, 3] <- Ceq
-      C_INPUT_EQ[i, 4] <- 0
-      C_INPUT_EQ[i, 5] <- 0
-      C_INPUT_EQ[i, 6] <- 0
-      C_INPUT_EQ[i, 7] <- 0
-      C_INPUT_EQ[i, 8] <- 0
-      C_INPUT_EQ[i, 9] <- 0
-      C_INPUT_EQ[i, 10] <- 0
-      C_INPUT_EQ[i, 11] <- 0
-      C_INPUT_EQ[i, 12] <- 0
-      C_INPUT_EQ[i, 13] <- 0
-      C_INPUT_EQ[i, 14] <- 0
-      C_INPUT_EQ[i, 15] <- 0
-      C_INPUT_EQ[i, 16] <- 0
-      C_INPUT_EQ[i, 17] <- 0
-      C_INPUT_EQ[i, 18] <- 0
-      C_INPUT_EQ[i, 19] <- 0
-      C_INPUT_EQ[i, 20] <- 0
-      C_INPUT_EQ[i, 21] <- 0
-      C_INPUT_EQ[i, 22] <- 0
-      C_INPUT_EQ[i, 23] <- 0
-      
-    }
-    
-    print(c(i, SOC, Ceq))
-    
-  }
-}
+
+# trees
+idx <- ifelse(rothC_r$LU == 4, TRUE, FALSE)
+rothC_trees <- within(rothC_df[idx, ], {
+  RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 1.7631 + 0.4043
+  BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 0.9757 + 0.0209
+  HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.8712 - 0.2904
+  DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
+  feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
+})
+
+
+# grass and shrubs
+idx <- ifelse(rothC_df$LU %in% c(3, 5, 6, 8), TRUE, FALSE)
+rothC_grasses <- within(rothC_df[idx, ], {
+  RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 1.3837 + 0.4692
+  BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 1.03401 + 0.02531
+  HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.9316 - 0.5243
+  DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
+  feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
+})
+
+
+# combine
+rothC_df <- rbind(rothC_crops, rothC_trees, rothC_grasses)
+ 
 ###############for loop ends##############
 
 

@@ -79,16 +79,16 @@ test <- sapol_bufbox$PR
 mapview::mapview(test)
 
 lapply(sapol_bufbox, function(x) write_sf(x, dsn = paste0("AOI_OCONUS_", x$asym, "_bufbox.shp")))
-lapply(sapol_bndy, function(x) write_sf(x, dsn = paste0("OCONUS_", x$asym, "_boundry.shp")))
+lapply(sapol_bndy, function(x)   write_sf(x, dsn = paste0("OCONUS_", x$asym, "_boundry.shp")))
 
 
 
 # GSOC ----
-aoi <- read_sf(dsn = "AOI_CONUS_bufbox.shp")
-gsoc <- raster("D:/geodata/soils/GSOCmap1.5.0.tif")
+aoi   <- read_sf(dsn = "AOIs/AOI_CONUS_bufbox.shp")
+gsoc  <- raster("D:/geodata/soils/GSOCmap1.5.0.tif")
 gsoc2 <- crop(gsoc, aoi)
-# writeRaster(gsoc2, filename =  "GSOCmap1.5.0_CONUS.tif", progress = "text", overwrite = TRUE)
-gsoc2 <- raster("GSOCmap1.5.0_CONUS.tif")
+# writeRaster(gsoc2, filename =  "CONUS_GSOCmap1.5.0.tif", progress = "text", overwrite = TRUE)
+gsoc2 <- raster("CONUS_GSOCmap1.5.0.tif")
 
 cms_soc <- raster("D:/geodata/soils/CMS_SOC_Mexico_CONUS_1737/data/SOC_prediction_1991_2010.tif")
 cms_soc_1km <- aggregate(cms_soc, fact = 4, fun = mean, progress = "text")
@@ -107,7 +107,7 @@ clay_4326 <- projectRaster(
   progress = "text", 
   overwrite = TRUE, 
   datatype = "INT4S"
-  )
+)
 
 
 
@@ -136,7 +136,7 @@ avgRS <- function(rs, var, mos) {
     idx  <- which(names(rs) %in% vars)
     cat("averaging", paste(names(rs[[idx]]), collapse = ", "), "\n", "\n")
     mean(rs[[idx]], na.rm = TRUE)
-    })
+  })
   final_rs <- stack(rs_l)
   names(final_rs) <- month.abb
   return(final_rs)
@@ -168,8 +168,71 @@ pet0121_avg <- resample(readAll(pet0121_avg), gsoc2, method = "bilinear", progre
 # writeRaster(tmp0121_avg, filename = "CONUS_Temp_Stack_01-19_TC.tif", overwrite = TRUE, datatype = "INT2S", options = c("COMPRESS=DEFLATE"))
 # writeRaster(ppt8100_avg, filename = "CONUS_Prec_Stack_81-00_TC.tif", overwrite = TRUE, datatype = "INT2S", options = c("COMPRESS=DEFLATE"))
 # writeRaster(ppt0121_avg, filename = "CONUS_Prec_Stack_01-19_TC.tif", overwrite = TRUE, datatype = "INT2S", options = c("COMPRESS=DEFLATE"))
-# writeRaster(pet8100_avg, filename = "CONUS_PET_Stack_81-00_TC.tif", overwrite = TRUE, datatype = "INT2S", options = c("COMPRESS=DEFLATE"))
-# writeRaster(pet0121_avg, filename = "CONUS_PET_Stack_01-19_TC.tif", overwrite = TRUE, datatype = "INT2S", options = c("COMPRESS=DEFLATE"))
+# writeRaster(pet8100_avg, filename = "CONUS_PET_Stack_81-00_TC.tif", overwrite = TRUE, options = c("COMPRESS=DEFLATE"))
+# writeRaster(pet0121_avg, filename = "CONUS_PET_Stack_01-19_TC.tif", overwrite = TRUE, options = c("COMPRESS=DEFLATE"))
+
+
+# Resample original data to GSOC extent ----
+# tmp8100
+gdalUtilities::gdalwarp(
+  srcfile = "CONUS_AverageTemperature_1981-2001.tif",
+  dstfile = "CONUS_Temp_Stack_228_81_00_TC.tif",
+  te      = c(bbox(gsoc2)),
+  tr      = res(gsoc2),
+  r       = "bilinear",
+  ot      = "Int16",
+  co      = "COMPRESS=DEFLATE"
+)
+# tmp0119
+gdalUtilities::gdalwarp(
+  srcfile = "CONUS_AverageTemperature_2001-2021.tif",
+  dstfile = "CONUS_Temp_Stack_228_01_19_TC.tif",
+  te      = c(bbox(gsoc2)),
+  tr      = res(gsoc2),
+  r       = "bilinear",
+  ot      = "Int16",
+  co      = "COMPRESS=DEFLATE"
+)
+# ppt8100
+gdalUtilities::gdalwarp(
+  srcfile = "CONUS_Precipitation_1981-2001.tif",
+  dstfile = "CONUS_Prec_Stack_228_81_00_TC.tif",
+  te      = c(bbox(gsoc2)),
+  tr      = res(gsoc2),
+  r       = "bilinear",
+  ot      = "Int16",
+  co      = "COMPRESS=DEFLATE"
+)
+# ppt0119
+gdalUtilities::gdalwarp(
+  srcfile = "CONUS_Precipitation_2001-2021.tif",
+  dstfile = "CONUS_Prec_Stack_228_01_19_TC.tif",
+  te      = c(bbox(gsoc2)),
+  tr      = res(gsoc2),
+  r       = "bilinear",
+  ot      = "Int16",
+  co      = "COMPRESS=DEFLATE"
+)
+# pet8100
+gdalUtilities::gdalwarp(
+  srcfile = "CONUS_PET_1981-2001.tif",
+  dstfile = "CONUS_PET_Stack_228_81-00_TC.tif",
+  te      = c(bbox(gsoc2)),
+  tr      = res(gsoc2),
+  r       = "bilinear",
+  ot      = "Int16",
+  co      = "COMPRESS=DEFLATE"
+)
+# pet0119
+gdalUtilities::gdalwarp(
+  srcfile = "CONUS_PET_2001-2021.tif",
+  dstfile = "CONUS_PET_Stack_228_01-19_TC.tif",
+  te      = c(bbox(gsoc2)),
+  tr      = res(gsoc2),
+  r       = "bilinear",
+  ot      = "Int16",
+  co      = "COMPRESS=DEFLATE"
+)
 
 
 # load cached files
@@ -209,13 +272,19 @@ tmp0121_avg_yr <- avgRSyr(tmp0121, "tmmx", yrs0121)
 tmp0121_avg_yr <- tmp0121_avg_yr * 0.1
 ppt8100_avg_yr <- avgRSyr(ppt8100, "pr", yrs8100)
 ppt0121_avg_yr <- avgRSyr(ppt0121, "pr", yrs0121)
+pet8100_avg_yr <- avgRSyr(pet8100, "pet", yrs8100)
+pet0121_avg_yr <- avgRSyr(pet0121, "pet", yrs0121)
 
 
 # resample to GSOC extent
 tmp8100_avg_yr <- resample(readAll(tmp8100_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
 tmp0121_avg_yr <- resample(readAll(tmp0121_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
+
 ppt8100_avg_yr <- resample(readAll(ppt8100_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
 ppt0121_avg_yr <- resample(readAll(ppt0121_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
+
+pet8100_avg_yr <- resample(readAll(pet8100_avg_yr), gsoc2, method = "bilinear", progress = "text")
+pet0121_avg_yr <- resample(readAll(pet0121_avg_yr), gsoc2, method = "bilinear", progress = "text")
 
 
 # cache averages by year
@@ -223,6 +292,8 @@ ppt0121_avg_yr <- resample(readAll(ppt0121_avg_yr), gsoc2, method = "bilinear", 
 # writeRaster(tmp0121_avg_yr, filename = "CONUS_TEMP_Stack_01-19_TC_yr.tif", overwrite = TRUE)
 # writeRaster(ppt8100_avg_yr, filename = "CONUS_Prec_Stack_81-00_TC_yr.tif", overwrite = TRUE)
 # writeRaster(ppt0121_avg_yr, filename = "CONUS_Prec_Stack_01-19_TC_yr.tif", overwrite = TRUE)
+# writeRaster(pet8100_avg_yr, filename = "CONUS_PET_Stack_81-00_TC_yr.tif", overwrite = TRUE)
+# writeRaster(pet0121_avg_yr, filename = "CONUS_PET_Stack_01-19_TC_yr2.tif", overwrite = TRUE)
 
 
 # load cached averages by year
@@ -230,6 +301,8 @@ tmp8100_avg_yr <- stack("CONUS_TEMP_Stack_81-00_TC_yr.tif")
 tmp0121_avg_yr <- stack("CONUS_TEMP_Stack_01-19_TC_yr.tif")
 ppt8100_avg_yr <- stack("CONUS_Prec_Stack_81-00_TC_yr.tif")
 ppt0121_avg_yr <- stack("CONUS_Prec_Stack_01-19_TC_yr.tif")
+pet8100_avg_yr <- stack("CONUS_PET_Stack_81-00_TC_yr.tif")
+pet0121_avg_yr <- stack("CONUS_PET_Stack_01-19_TC_yr.tif")
 
 
 # Calculate eq 1 from MIAMI MODEL (g DM/m2/day)
@@ -281,14 +354,14 @@ writeRaster(npp8100_min_TnCHaYr,
             filename = "CONUS_NPP_MIAMI_tnC_Ha_Year_STACK_81-00_MIN.tif", 
             overwrite = TRUE, 
             options = c("COMPRESS=DEFLATE")
-            )
+)
 
 npp8100_min_TnCHaYr_avg <- mean(npp8100_min_TnCHaYr) 
 writeRaster(npp8100_min_TnCHaYr_avg, 
             filename = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MIN.tif", 
             overwrite = TRUE, 
             options = c("COMPRESS=DEFLATE")
-            )
+)
 
 
 # Max
@@ -314,14 +387,14 @@ writeRaster(npp8100_max_TnCHaYr,
             filename = "CONUS_NPP_MIAMI_tnC_Ha_Year_STACK_81-00_MAX.tif", 
             overwrite = TRUE, 
             options = c("COMPRESS=DEFLATE")
-            )
+)
 
 npp8100_max_TnCHaYr_avg <- mean(npp8100_max_TnCHaYr) 
 writeRaster(npp8100_max_TnCHaYr_avg, 
             filename = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif", 
             overwrite = TRUE, 
             options = c("COMPRESS=DEFLATE")
-            )
+)
 
 
 
@@ -362,7 +435,7 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           LU   = "CONUS_glc_shv10_DOM.tif",
           DR   = "CONUS_glc_shv10_DOM_DR.tif",
           COV  = "CONUS_Cov_stack_AOI.tif"
-          )
+)
 su_rs <- readAll(stack(vars))
 # writeRaster(su_rs, filename = "Stack_Set_SPIN_UP_AOI.tif", format = "GTiff", progress = "text", overwrite = TRUE)
 
@@ -377,22 +450,77 @@ n_wu <- 18
 
 vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           CLAY = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
+          TEMP = "CONUS_Temp_Stack_228_01_19_TC.tif",
+          PREC = "CONUS_Prec_Stack_228_01_19_TC.tif",
+          PET  = "CONUS_PET_Stack_228_01-19_TC.tif",
+          LU   = "CONUS_glc_shv10_DOM.tif",
+          DR   = "CONUS_glc_shv10_DOM_DR.tif",
           COV  = "CONUS_Cov_stack_AOI.tif",
-          DR   = "CONUS_glc_shv10_DOM_DR.tif"
+          NPP  = "CONUS_NPP_MIAMI_MEAN_81-00_AOI.tif",
+          NPP_MIN = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MIN.tif",
+          NPP_MAX = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"
 )
+# LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
+wu_rs <- rast(vars)
 
-LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
+tiles <- st_as_sf(st_make_grid(aoi, n = c(6, 6)))
+tiles$tile <- 1:nrow(tiles)
 
-wu_rs <- stack(vars, LU)
-# writeRaster(wu_rs, filename = "Stack_Set_WARM_UP_AOI.tif", format = "GTiff", progress = "text", overwrite = TRUE)
+
+# iterate over tiles and extract points
+test <- lapply(1:34, function(x) {
+  
+  cat("cropping ", x, as.character(Sys.time()), "\n")
+  
+  # crop raster stack
+  tiles_sub <- vect(tiles[tiles$tile == x, ])
+  # tiles_sub <- as(tiles[tiles$tile == x, ], "Spatial")
+  rs_sub    <- crop(wu_rs, tiles_sub)
+  
+  # mask non-ag landuses
+  LU <- c(2, 3, 5, 12)
+  rs_sub$CONUS_glc_shv10_DOM[! rs_sub$CONUS_glc_shv10_DOM %in% LU] <- NA
+  
+  # extract points
+  lu_pts <- as.points(rs_sub$CONUS_glc_shv10_DOM)
+  wu_pts <- extract(rs_sub, lu_pts, xy = TRUE)
+  
+  # save points
+  saveRDS(wu_pts, file = paste0("wu_pts_tile_", x, ".rds"))
+  
+  return(dim(wu_pts))
+})
+
+
+f <- paste0("wu_pts_tile_", 1:34, ".rds")
+wu_pts <- lapply(f, function(x){
+  temp   <- readRDS(file = x)
+  
+  nm     <- names(temp)
+  idx    <- which(!grepl("_tmmx$|_pr$|_pet$", nm))
+  id_tmp <- which(grepl("_tmmx$", nm))[1]
+  id_ppt <- which(grepl("_pr$", nm))[1]
+  id_pet <- which(grepl("_pet$", nm))[1]
+  
+  temp <- temp[c(
+    idx, 
+    id_tmp:(id_tmp + 11),
+    id_ppt:(id_ppt + 11),
+    id_pet:(id_pet + 11)
+  )]
+  # dim(temp)
+  })
+wu_pts <- do.call("rbind", wu_pts)
+# saveRDS(wu_pts, file = "wu_pts.rds")
+# file.remove(f)
 
 
 # Forward Stack
 vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           CLAY = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
-          TEMP = "CONUS_Temp_Stack_01-19_TC.tif",
-          PREC = "CONUS_Prec_Stack_01-19_TC.tif",
-          PET  = "CONUS_PET_Stack_01-19_TC.tif",
+          TEMP = "CONUS_Temp_Stack_01-19_TC_yr.tif",
+          PREC = "CONUS_Prec_Stack_228_01_19_TC.tif",
+          PET  = "CONUS_PET_Stack_228_01-19_TC.tif",
           DR   = "CONUS_glc_shv10_DOM_DR.tif",
           LU   = "CONUS_glc_shv10_DOM.tif",
           COV  = "CONUS_Cov_stack_AOI.tif"
