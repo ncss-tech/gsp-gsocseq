@@ -125,38 +125,9 @@ for (i in 1:ncol(fT)) {
   xi_max[, i] <- fT[, i] * fW_max[, i] * fC[, i] * fPR
 }
 
-
-# IOM using Falloon method ----
-FallIOM_r   <- 0.049 * SOC_r^1.139
-FallIOM_min <- 0.049 * SOC_min^1.139 
-FallIOM_max <- 0.049 * SOC_max^1.139
-
-
-# Roth C inputs ----
-DPMptf  <- 0
-RPMptf  <- 0
-BIOptf  <- 0
-HUMptf  <- 0
-Cinputs <- 1
-
-
-ri_r <- data.frame(
-  id = as.integer(1:nrow(xi_r)), 
-  iter = as.character(rep(1:16, length.out= nrow(xi_r))), 
-  FallIOM_r, DR, pClay_r, xi_r
-  )
-
-ri_min <- data.frame(
-  id = as.integer(1:nrow(xi_min)), 
-  iter = as.character(rep(1:16, length.out= nrow(xi_min))), 
-  FallIOM_min, DR, pClay_min, xi_min
-)
-
-ri_max <- data.frame(
-  id = as.integer(1:nrow(xi_max)), 
-  iter = as.character(rep(1:16, length.out= nrow(xi_max))), 
-  FallIOM_max, DR, pClay_max, xi_max
-)
+ri_r   <- cbind(id = 1:nrow(xi_r),   xi_r)
+ri_min <- cbind(id = 1:nrow(xi_min), xi_min)
+ri_max <- cbind(id = 1:nrow(xi_max), xi_max)
 
 # # Roth C outputs
 # ro <- list(data.frame(id = NULL, C1 = NULL, C2 = NULL, C3 = NULL, C4 = NULL, C5 = NULL))[rep(1, nrow(ri))]
@@ -189,7 +160,7 @@ clus <- makeCluster(15)
 
 
 # C input equilibrium. (Ceq) ----
-clusterExport(clus, list("ri_r", "years", "DPMptf", "RPMptf", "BIOptf", "HUMptf", "Cinputs", "carbonTurnover")) # , "rothC"))
+clusterExport(clus, list("wu_df", "ri_r", "years", "carbonTurnover")) # , "rothC"))
 
 Sys.time()
 rothC_r <- parLapply(clus, 1:200, function(i) {
@@ -333,40 +304,24 @@ rothC_grasses <- within(rothC_df[idx, ], {
 
 # combine
 rothC_df <- rbind(rothC_crops, rothC_trees, rothC_grasses)
+rothC_df[c("V1", "m")] <- NULL
+
+
+# reshape
+nm   <- names(rothC_df)
+vars <- c("ID", "x", "y", "source", "LU")
+vars2 <- nm[! nm %in% vars]
+
+rothC_dfw <- reshape(rothC_df, direction = "wide",
+                     idvar = c("ID"),
+                     timevar = "source", 
+                     v.names = vars2)
  
-###############for loop ends##############
+# convert to sf
+rothC_sf <- st_as_sf(
+  rothC_dfw,
+  coords = c("x", "y"),
+  crs = 4326
+)
 
-
-#rename de columns
-
-colnames(C_INPUT_EQ@data)[2] = "SOC_FAO"
-colnames(C_INPUT_EQ@data)[3] = "Cinput_EQ"
-colnames(C_INPUT_EQ@data)[4] = "SOC_pedotransfer"
-colnames(C_INPUT_EQ@data)[5] = "DPM_pedotransfer"
-colnames(C_INPUT_EQ@data)[6] = "RPM_pedotransfer"
-colnames(C_INPUT_EQ@data)[7] = "BIO_pedotransfer"
-colnames(C_INPUT_EQ@data)[8] = "HUM_pedotransfer"
-colnames(C_INPUT_EQ@data)[9] = "IOM_pedotransfer"
-colnames(C_INPUT_EQ@data)[10] = "CIneq_min"
-colnames(C_INPUT_EQ@data)[11] = "CIneq_max"
-colnames(C_INPUT_EQ@data)[12] = "SOC_min"
-colnames(C_INPUT_EQ@data)[13] = "DPM_min"
-colnames(C_INPUT_EQ@data)[14] = "RPM_min"
-colnames(C_INPUT_EQ@data)[15] = "BIO_min"
-colnames(C_INPUT_EQ@data)[16] = "HUM_min"
-colnames(C_INPUT_EQ@data)[17] = "IOM_min"
-colnames(C_INPUT_EQ@data)[18] = "SOC_max"
-colnames(C_INPUT_EQ@data)[19] = "DPM_max"
-colnames(C_INPUT_EQ@data)[20] = "RPM_max"
-colnames(C_INPUT_EQ@data)[21] = "BIO_max"
-colnames(C_INPUT_EQ@data)[22] = "HUM_max"
-colnames(C_INPUT_EQ@data)[23] = "IOM_max"
-
-# SAVE the Points (shapefile)
-
-setwd("C:/TRAINING_MATERIALS_GSOCseq_MAPS_12-11-2020/OUTPUTS/1_SPIN_UP")
-writeOGR(C_INPUT_EQ,
-         ".",
-         "SPIN_UP_County_AOI",
-         driver = "ESRI Shapefile",
-         overwrite = TRUE)
+saveRDS(rothC_sf, file = "conus_su_results.rds")
