@@ -494,20 +494,20 @@ test <- lapply(1:34, function(x) {
 
 f <- paste0("wu_pts_tile_", 1:34, ".rds")
 wu_pts <- lapply(f, function(x){
-  temp   <- readRDS(file = x)
-  
-  nm     <- names(temp)
-  idx    <- which(!grepl("_tmmx$|_pr$|_pet$", nm))
-  id_tmp <- which(grepl("_tmmx$", nm))[1]
-  id_ppt <- which(grepl("_pr$", nm))[1]
-  id_pet <- which(grepl("_pet$", nm))[1]
-  
-  temp <- temp[c(
-    idx, 
-    id_tmp:(id_tmp + 11),
-    id_ppt:(id_ppt + 11),
-    id_pet:(id_pet + 11)
-  )]
+  temp <- readRDS(file = x)
+  temp <- temp[complete.cases(temp), ]
+  # nm     <- names(temp)
+  # idx    <- which(!grepl("_tmmx$|_pr$|_pet$", nm))
+  # id_tmp <- which(grepl("_tmmx$", nm))[1]
+  # id_ppt <- which(grepl("_pr$", nm))[1]
+  # id_pet <- which(grepl("_pet$", nm))[1]
+  # 
+  # temp <- temp[c(
+  #   idx, 
+  #   id_tmp:(id_tmp + 11),
+  #   id_ppt:(id_ppt + 11),
+  #   id_pet:(id_pet + 11)
+  # )]
   # dim(temp)
   })
 wu_pts <- do.call("rbind", wu_pts)
