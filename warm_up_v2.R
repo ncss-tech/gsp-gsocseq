@@ -60,11 +60,7 @@ NPP_min <- wu_df$`CONUS_NPP_MIAMI_MEAN_81-00_AOI_MIN`
 NPP_max <- wu_df$`CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX`
 
 
-# Cinputs
-C_rv  <- wu_df$Ceq.r
-C_min <- wu_df$Ceq.min
-C_max <- wu_df$Ceq.max
-
+# Calculate Cinputs
 yrs0119  <- lapply(2001:2019, function(x) paste0(x, formatC(1:12, width = 2, flag = "0")))
 
 TEMP_avg <- sapply(yrs0119, function(x) {
@@ -85,9 +81,6 @@ PREC_sum <- sapply(yrs0119, function(x) {
 # PREC_sum     <- rowSums(PREC)
 PREC_sum_min <- PREC_sum * 0.95
 PREC_sum_max <- PREC_sum * 1.05
-
-
-rm(wu_df, PREC, TEMP)
 
 
 # Apply NPP coeficientes
@@ -116,13 +109,9 @@ NPP_M_max <- sapply(1:ncol(PREC_sum), function(i) {
 })
 
 
-rm(PREC_sum, PREC_sum_min, PREC_sum_max)
-rm(TEMP_avg, TEMP_avg_min, TEMP_avg_max)
-
-
 npp_coef <- function(LU, NPP) {
-  (LU == 2 | LU == 12 | LU == 13) * NPP * 0.53 +
-  (LU == 4) * NPP * 0.88 + 
+  (LU == 2 | LU == 12 | LU == 13)          * NPP * 0.53 +
+  (LU == 4)                                * NPP * 0.88 + 
   (LU ==3  | LU == 5  | LU == 6 | LU == 8) * NPP * 0.72
 }
 
@@ -131,9 +120,9 @@ NPP_M_min <- sapply(1:19, function(i) npp_coef(LU, NPP_M_min[, i]))
 NPP_M_max <- sapply(1:19, function(i) npp_coef(LU, NPP_M_max[, i]))
 
 
-C_rv  <- cbind(replicate(19, C_rv))
-C_min <- cbind(replicate(19, C_min))
-C_max <- cbind(replicate(19, C_max))
+C_rv  <- cbind(replicate(19, wu_df$Ceq.r))
+C_min <- cbind(replicate(19, wu_df$Ceq.min))
+C_max <- cbind(replicate(19, wu_df$Ceq.max))
 
 
 C_rv[, 1]  <- C_rv[, 1]  / NPP_M[, 1]     * NPP_M[, 1]
@@ -146,11 +135,24 @@ C_rv[, idx]  <- sapply(idx, function(i) C_rv[,  i - 1] / NPP_M[, (i - 1)]   * NP
 C_min[, idx] <- sapply(idx, function(i) C_min[, i - 1] / NPP_M_min[, i - 1] * NPP_M_min[, i])
 C_max[, idx] <- sapply(idx, function(i) C_max[, i - 1] / NPP_M_max[, i - 1] * NPP_M_max[, i])
 
-rm(NPP_M, NPP_M_min, NPP_M_max)
+
+idx <- 1:19
+C_rv[, idx]  <- sapply(idx, function(i) ifelse(is.na(C_rv[,  i]),  0,  C_rv[,  i]))
+C_min[, idx] <- sapply(idx, function(i) ifelse(is.na(C_min[,  i]), 0,  C_min[,  i]))
+C_max[, idx] <- sapply(idx, function(i) ifelse(is.na(C_max[,  i]), 0,  C_max[,  i]))
+
 
 saveRDS(C_rv,  "wu_C_rv.rds")
 saveRDS(C_min, "wu_C_min.rds")
 saveRDS(C_max, "wu_C_max.rds")
+
+
+rm(wu_df)
+rm(PREC_sum, PREC_sum_min, PREC_sum_max)
+rm(TEMP_avg, TEMP_avg_min, TEMP_avg_max)
+rm(NPP_M, NPP_M_min, NPP_M_max)
+rm(C_rv, C_min, C_max)
+
 
 
 # Moisture effects per month ----
@@ -199,11 +201,13 @@ fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
 }
 
 
+wu_df <- readRDS("wu_df.rds")
 pClay_r   <- wu_df$CONUS_gnatsgo_fy20_1km_clay_wt
 TEMP <- wu_df[grepl("_tmmx$", names(wu_df))]
 PREC <- wu_df[grepl("_pr$", names(wu_df))]
 PET  <- wu_df[grepl("_pet$",  names(wu_df))]
 COV  <- wu_df[grepl("^CON_",  names(wu_df))]
+rm(wu_df)
 
 
 fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
@@ -212,9 +216,18 @@ fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
 
 
 # Temperature effects per month ----
-fT_r   <- as.data.frame(lapply(TEMP,        function(x) fT.RothC(x)))
-fT_min <- as.data.frame(lapply(TEMP * 1.02, function(x) fT.RothC(x)))
-fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) fT.RothC(x)))
+fT_r   <- as.data.frame(lapply(TEMP,        function(x) {
+  temp <- fT.RothC(x)
+  temp <- ifelse(is.na(temp), 0, temp)
+  }))
+fT_min <- as.data.frame(lapply(TEMP * 1.02, function(x) {
+  temp <- fT.RothC(x)
+  temp <- ifelse(is.na(temp), 0, temp)
+  }))
+fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) {
+  temp <- fT.RothC(x)
+  temp <- ifelse(is.na(temp), 0, temp)
+  }))
 
 
 # Vegetation Cover effects ----
@@ -248,7 +261,7 @@ xi_min <- cbind(id = 1:nrow(xi_min), xi_min)
 xi_max <- cbind(id = 1:nrow(xi_max), xi_max)
 
 
-saveRDS(xi_r,   "wu_effcts_r.rds")
+saveRDS(xi_r,   "wu_effcts_r.rds");   rm(xi_r,   fW_r,   fT_r,   fC, fPR)
 saveRDS(xi_min, "wu_effcts_min.rds"); rm(xi_min, fW_min, fT_min, fC, fPR)
 saveRDS(xi_max, "wu_effcts_max.rds"); rm(xi_max, fW_max, fT_max, fC, fPR)
 
@@ -256,8 +269,8 @@ saveRDS(xi_max, "wu_effcts_max.rds"); rm(xi_max, fW_max, fT_max, fC, fPR)
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
-nSim  <- nlayers(stack("CONUS_Temp_Stack_228_01_19_TC.tif")) / 12
-years <- seq(1 / 12, nSim, by = 1 / 12)
+nSim  <- raster::nlayers(raster::stack("CONUS_Temp_Stack_228_01_19_TC.tif")) / 12
+years <- seq(1 / 12, 1, by = 1 / 12)
 
 su_df <- readRDS("su_df.rds")
 
@@ -274,14 +287,13 @@ DR   <- su_df$CONUS_glc_shv10_DOM_DR
 
 library(parallel)
 
-clus <- makeCluster(5)
-
+clus <- makeCluster(7)
 
 # C input equilibrium. (Ceq) ----
 clusterExport(clus, list("su_df", "C_rv", "DR", "xi_r", "years", "carbonTurnover"))
 
 Sys.time()
-rothC_r <- parLapply(clus, 1:100, function(i) {
+rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
   
   temp <- carbonTurnover(
     tt   = years,
@@ -292,13 +304,28 @@ rothC_r <- parLapply(clus, 1:100, function(i) {
     effcts = data.frame(years, rep(unlist(xi_r[i, 2:229]), length.out = length(years))),
     solver = "euler"
   )
-  fp <- tail(temp, 1)
+  fp <- list(tail(temp, 1)[-1])
   
-  # c(ri_r[i, 1], unlist(temp[6000, 2:6]))
+  for (j in 2:19) {
+    temp <- carbonTurnover(
+      tt   = years,
+      C0   = c(fp[[1]][1], fp[[1]][2], fp[[1]][3], fp[[1]][4], fp[[1]][5]),
+      In   = C_rv[i, j],
+      Dr   = DR[i],
+      clay = su_df[i, ]$CONUS_gnatsgo_fy20_1km_clay_wt,
+      effcts = data.frame(years, rep(unlist(xi_r[i, 2:229]), length.out = length(years))),
+      solver = "euler"
+    )
+    fp[[1]] <- tail(temp, 1)[-1]
+  }
+  
+  fp <- unlist(fp)
   
   return(fp)
 })
 Sys.time()
-# saveRDS(rothC_r, file = "rothC_r.rds")
+saveRDS(rothC_r, file = "rothC_r_wu.rds")
 stopCluster(clus)
+
+rc_wu <- do.call("rbind", rothC_r)
 
