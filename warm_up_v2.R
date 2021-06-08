@@ -51,7 +51,7 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 wu_df <- readRDS("wu_df.rds")
 
 
-# Extract the layers from the Vector
+# Extract variables
 LU   <- wu_df$CONUS_glc_shv10_DOM
 TEMP <- wu_df[grepl("_tmmx$", names(wu_df))]
 PREC <- wu_df[grepl("_pr$", names(wu_df))]
@@ -112,7 +112,7 @@ NPP_M_max <- sapply(1:ncol(PREC_sum), function(i) {
 npp_coef <- function(LU, NPP) {
   (LU == 2 | LU == 12 | LU == 13)          * NPP * 0.53 +
   (LU == 4)                                * NPP * 0.88 + 
-  (LU ==3  | LU == 5  | LU == 6 | LU == 8) * NPP * 0.72
+  (LU == 3 | LU == 5  | LU == 6 | LU == 8) * NPP * 0.72
 }
 
 NPP_M     <- sapply(1:19, function(i) npp_coef(LU, NPP_M[, i]))
@@ -324,8 +324,89 @@ rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(fp)
 })
 Sys.time()
-saveRDS(rothC_r, file = "rothC_r_wu.rds")
+# saveRDS(rothC_r, file = "rothC_r_wu.rds")
 stopCluster(clus)
 
-rc_wu <- do.call("rbind", rothC_r)
+
+# rerun on negative values using a different solver
+rc_wu <- readRDS(file = "rothC_r_wu.rds")
+rc_wu <- as.data.frame(do.call("rbind", rc_wu))
+idx <- which(apply(rc_wu, 1, function(x) any(x < 0)))
+
+su_df <- su_df[idx, ]
+C_rv  <- C_rv[idx, ]
+DR    <- DR[idx]
+xi_r  <- xi_r[idx, ]
+
+
+library(parallel)
+clus <- makeCluster(15)
+clusterExport(clus, list("idx", "su_df", "C_rv", "DR", "xi_r", "years", "RothCModel", "getC"))
+Sys.time()
+rothC_r_nn <- parLapply(clus, 1:nrow(su_df), function(i) {
+  
+  temp <- RothCModel(
+    t    = years,
+    C0   = c(su_df[i, ]$DPM_p.r, su_df[i, ]$RPM_p.r, su_df[i, ]$BIO_p.r, su_df[i, ]$HUM_p.r, su_df[i, ]$FallIOM.r),
+    In   = C_rv[i, 1],
+    DR   = DR[i],
+    clay = su_df[i, ]$CONUS_gnatsgo_fy20_1km_clay_wt,
+    xi   = data.frame(years, rep(unlist(xi_r[i, 2:229]), length.out = length(years))),
+    pass = TRUE
+  )
+  fp <- list(tail(getC(temp), 1))
+  
+  for (j in 2:19) {
+    temp <- RothCModel(
+      t    = years,
+      C0   = c(fp[[1]][1], fp[[1]][2], fp[[1]][3], fp[[1]][4], fp[[1]][5]),
+      In   = C_rv[i, j],
+      DR   = DR[i],
+      clay = su_df[i, ]$CONUS_gnatsgo_fy20_1km_clay_wt,
+      xi   = data.frame(years, rep(unlist(xi_r[i, 2:229]), length.out = length(years))),
+      pass = TRUE
+    )
+    fp[[1]] <- tail(getC(temp), 1)
+  }
+  
+  fp <- unlist(fp)
+  
+  return(fp)
+})
+Sys.time()
+# saveRDS(rothC_r_nn, file = "rothC_r_wu_nonneg.rds")
+stopCluster(clus)
+
+
+
+# Combine outputs ----
+rc_wu    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu.rds")))
+rc_wu_nn <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu_nonneg.rds")))
+su_df    <- readRDS("su_df.rds")
+
+
+# replace
+idx <- which(apply(rc_wu, 1, function(x) any(x < 0)))
+rc_wu[idx, ] <- rc_wu_nn
+
+
+# check
+format(summary(rc_wu), big.mark = ",", scientific = FALSE)
+sum(apply(rc_wu, 1, function(x) any(x < 0)))
+
+
+# combine
+names(su_df)[1:3] <- c("X", "Y", "ID")
+vars <- c("X", "Y", "ID", "SOC.r", "Ceq.r")
+
+rc_wu <- cbind(
+  su_df[vars],
+  SOC_t0 = rowSums(rc_wu),
+  rc_wu
+  )
+names(rc_wu)[7:11] <- c("DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
+
+
+# save final results
+saveRDS(rc_wu, file = "rothC_r_wu_final.rds")
 

@@ -159,6 +159,12 @@ library(parallel)
 clus <- makeCluster(15)
 
 
+Cinputs     <- 1
+FallIOM_r   <- 0.049 * SOC_r^(1.139)
+FallIOM_min <- 0.049 * SOC_min^(1.139)
+FallIOM_max <- 0.049 * SOC_max^(1.139)
+
+
 # C input equilibrium. (Ceq) ----
 clusterExport(clus, list("wu_df", "ri_r", "years", "carbonTurnover")) # , "rothC"))
 
