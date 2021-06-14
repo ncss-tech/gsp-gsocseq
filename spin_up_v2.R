@@ -57,7 +57,18 @@ fPR <- (LU == 13) * 0.4 + (LU != 13) * 1
 
 
 # Temperature effects per month ----
-fT <- as.data.frame(lapply(TEMP, function(x) fT.RothC(x)))
+fT_r   <- as.data.frame(lapply(TEMP,        function(x) {
+  temp <- fT.RothC(x)
+  temp <- ifelse(is.na(temp), 0, temp)
+}))
+fT_min <- as.data.frame(lapply(TEMP * 1.02, function(x) {
+  temp <- fT.RothC(x)
+  temp <- ifelse(is.na(temp), 0, temp)
+}))
+fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) {
+  temp <- fT.RothC(x)
+  temp <- ifelse(is.na(temp), 0, temp)
+}))
 
     
 # Moisture effects per month ----
@@ -101,9 +112,9 @@ fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
   return(fW)
   }
 
-fW_r   <- fW(pClay_r,   PREC, PET, COV, s_thk = 30, pE = 1)
-fW_min <- fW(pClay_min, PREC, PET, COV, s_thk = 30, pE = 1)
-fW_max <- fW(pClay_max, PREC, PET, COV, s_thk = 30, pE = 1)
+fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
+fW_min <- fW(pClay_r * 0.9, PREC * 0.95, PET, COV, s_thk = 30, pE = 1)
+fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
 
     
 # Vegetation Cover effects ----
@@ -111,23 +122,28 @@ fC <- COV
     
 
 # Set the factors frame for Model calculations ----
-xi_r   <- fT
-xi_min <- fT
-xi_max <- fT
+xi_r   <- fT_r
+xi_min <- fT_min
+xi_max <- fT_max
 
-for (i in 1:ncol(fT)) {
-  xi_r[, i] <- fT[, i] * fW_r[, i] * fC[, i] * fPR
+for (i in 1:ncol(fT_r)) {
+  xi_r[, i] <- fT_r[, i]       * fW_r[, i]   * fC[, i] * fPR
 }
-for (i in 1:ncol(fT)) {
-  xi_min[, i] <- fT[, i] * fW_min[, i] * fC[, i] * fPR
+for (i in 1:ncol(fT_min)) {
+  xi_min[, i] <- fT_min[, i] * fW_min[, i] * fC[, i] * fPR
 }
-for (i in 1:ncol(fT)) {
-  xi_max[, i] <- fT[, i] * fW_max[, i] * fC[, i] * fPR
+for (i in 1:ncol(fT_max)) {
+  xi_max[, i] <- fT_max[, i] * fW_max[, i] * fC[, i] * fPR
 }
 
-ri_r   <- cbind(id = 1:nrow(xi_r),   xi_r)
+ri_r   <- cbind(id = 1:nrow(xi_r),   xi_r); 
 ri_min <- cbind(id = 1:nrow(xi_min), xi_min)
 ri_max <- cbind(id = 1:nrow(xi_max), xi_max)
+
+saveRDS(ri_r,   "su_effcts_r.rds");   rm(su_sdf, TEMP, PREC, PET, xi_r, fT_r, fW_r, fC, fPR, COV)
+saveRDS(ri_min, "wu_effcts_min.rds"); 
+saveRDS(ri_max, "wu_effcts_max.rds"); 
+
 
 # # Roth C outputs
 # ro <- list(data.frame(id = NULL, C1 = NULL, C2 = NULL, C3 = NULL, C4 = NULL, C5 = NULL))[rep(1, nrow(ri))]
@@ -154,38 +170,47 @@ ri_max <- cbind(id = 1:nrow(xi_max), xi_max)
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
 
-library(parallel)
+Cinputs <- 1
+DR      <- su_df$DR
 
-clus <- makeCluster(15)
+pClay_r   <- su_df$CLAY
+pClay_min <- su_df$CLAY * 0.9
+pClay_max <- su_df$CLAY * 1.1
 
+SOC_r    <- su_df$SOC
+SOC_min  <- su_df$SOC * 0.8
+SOC_max  <- su_df$SOC * 1.2
 
-Cinputs     <- 1
 FallIOM_r   <- 0.049 * SOC_r^(1.139)
 FallIOM_min <- 0.049 * SOC_min^(1.139)
 FallIOM_max <- 0.049 * SOC_max^(1.139)
 
 
+library(parallel)
+
+clus <- makeCluster(15)
+
 # C input equilibrium. (Ceq) ----
-clusterExport(clus, list("wu_df", "ri_r", "years", "carbonTurnover")) # , "rothC"))
+clusterExport(clus, list("su_df", "DR", "pClay_r", "ri_r", "FallIOM_r", "years", "carbonTurnover")) # , "rothC"))
 
 Sys.time()
-rothC_r <- parLapply(clus, 1:200, function(i) {
+rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
   
   temp <- carbonTurnover(
     tt   = years,
-    C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, ri_r[i, 3]),
-    In   = Cinputs,
-    Dr   = ri_r[i, 4],
-    clay = ri_r[i, 5],
-    effcts = data.frame(years, rep(unlist(ri_r[i, 6:17]), length.out = length(years))),
+    C0   = c(0, 0, 0, 0, FallIOM_r[i]),
+    In   = 1,
+    Dr   = DR[i],
+    clay = pClay_r[i],
+    effcts = data.frame(years, rep(unlist(ri_r[i, 2:13]), length.out = length(years))),
     solver = "euler"
   )
-  temp <- c(ri_r[i, 1], unlist(temp[6000, 2:6]))
+  temp <- tail(temp, 1)
   
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_r, file = "rothC_r.rds")
+# saveRDS(rothC_r, file = "rothC_r_v2.rds")
 stopCluster(clus)
 
 
@@ -235,7 +260,6 @@ rothC_max <- parLapply(clus, 1:nrow(ri_max), function(i) {
 Sys.time()
 # saveRDS(rothC_max, file = "rothC_max.rds")
 stopCluster(clus)
-
 
 
 

@@ -120,7 +120,7 @@ tmp0121 <- stack("CONUS_AverageTemperature_2001-2021.tif")
 ppt8100 <- stack("CONUS_Precipitation_1981-2001.tif")
 ppt0121 <- stack("CONUS_Precipitation_2001-2021.tif")
 pet8100 <- stack("CONUS_PET_1981-2001.tif")
-pet0121 <- stack("CONUS_PET_2001-2021.tif")
+pet0119 <- stack("CONUS_PET_2001-2021.tif")
 
 
 # create list of raster names by month
@@ -144,14 +144,14 @@ avgRS <- function(rs, var, mos) {
 
 
 # average months
-tmp8100_avg <- avgRS(tmp8100, "tmmx", mos8100)
-tmp8100_avg <- tmp8100_avg * 0.1
-tmp0121_avg <- avgRS(tmp0121, var = "tmmx", mos0121)
-tmp0121_avg <- tmp0121_avg * 0.1
+tmp8100_avg <- avgRS(tmp8100, "tmmx", mos8100)       * 0.1
+tmp0119_avg <- avgRS(tmp0119, var = "tmmx", mos0119) * 0.1
+
 ppt8100_avg <- avgRS(ppt8100, "pr", mos8100)
-ppt0121_avg <- avgRS(ppt0121, "pr", mos0119)
-pet8100_avg <- avgRS(pet8100, "pet", mos8100)
-pet0121_avg <- avgRS(pet0121, "pet", mos0119)
+ppt0119_avg <- avgRS(ppt0119, "pr", mos0119)
+
+pet8100_avg <- avgRS(pet8100, "pet", mos8100) * 0.1
+pet0119_avg <- avgRS(pet0119, "pet", mos0119) * 0.1
 
 
 # resample to GSOC extent
@@ -160,7 +160,7 @@ tmp0121_avg <- resample(readAll(tmp0121_avg), gsoc2, method = "bilinear", progre
 ppt8100_avg <- resample(readAll(ppt8100_avg), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
 ppt0121_avg <- resample(readAll(ppt0121_avg), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
 pet8100_avg <- resample(readAll(pet8100_avg), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
-pet0121_avg <- resample(readAll(pet0121_avg), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
+pet0119_avg <- resample(readAll(pet0119_avg), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
 
 
 # cache files
@@ -169,7 +169,7 @@ pet0121_avg <- resample(readAll(pet0121_avg), gsoc2, method = "bilinear", progre
 # writeRaster(ppt8100_avg, filename = "CONUS_Prec_Stack_81-00_TC.tif", overwrite = TRUE, datatype = "INT2S", options = c("COMPRESS=DEFLATE"))
 # writeRaster(ppt0121_avg, filename = "CONUS_Prec_Stack_01-19_TC.tif", overwrite = TRUE, datatype = "INT2S", options = c("COMPRESS=DEFLATE"))
 # writeRaster(pet8100_avg, filename = "CONUS_PET_Stack_81-00_TC.tif", overwrite = TRUE, options = c("COMPRESS=DEFLATE"))
-# writeRaster(pet0121_avg, filename = "CONUS_PET_Stack_01-19_TC.tif", overwrite = TRUE, options = c("COMPRESS=DEFLATE"))
+# writeRaster(pet0119_avg, filename = "CONUS_PET_Stack_01-19_TC.tif", overwrite = TRUE, options = c("COMPRESS=DEFLATE"))
 
 
 # Resample original data to GSOC extent ----
@@ -241,14 +241,14 @@ tmp0121_avg <- stack("CONUS_Temp_Stack_01-19_TC.tif")
 ppt8100_avg <- stack("CONUS_Prec_Stack_81-00_TC.tif")
 ppt0121_avg <- stack("CONUS_Prec_Stack_01-19_TC.tif")
 pet8100_avg <- stack("CONUS_PET_Stack_81-00_TC.tif")
-pet0121_avg <- stack("CONUS_PET_Stack_01-19_TC.tif")
+pet0119_avg <- stack("CONUS_PET_Stack_01-19_TC.tif")
 
 
 # create list of raster names by year
 yrs8100 <- lapply(1981:2000, function(x) paste0("X", x))
 yrs8100 <- lapply(yrs8100, function(x) paste0(x, formatC(1:12, width = 2, flag = "0")))
-yrs0121 <- lapply(2001:2019, function(x) paste0("X", x))
-yrs0121 <- lapply(yrs0121, function(x) paste0(x, formatC(1:12, width = 2, flag = "0")))
+yrs0119 <- lapply(2001:2019, function(x) paste0("X", x))
+yrs0119 <- lapply(yrs0119, function(x) paste0(x, formatC(1:12, width = 2, flag = "0")))
 
 
 # function to average years
@@ -266,14 +266,12 @@ avgRSyr <- function(rs, var, yrs) {
 
 
 # average by year
-tmp8100_avg_yr <- avgRSyr(tmp8100, "tmmx", yrs8100)
-tmp8100_avg_yr <- tmp8100_avg_yr * 0.1
-tmp0121_avg_yr <- avgRSyr(tmp0121, "tmmx", yrs0121)
-tmp0121_avg_yr <- tmp0121_avg_yr * 0.1
+tmp8100_avg_yr <- avgRSyr(tmp8100, "tmmx", yrs8100) * 0.1
+tmp0121_avg_yr <- avgRSyr(tmp0121, "tmmx", yrs0121) * 0.1
 ppt8100_avg_yr <- avgRSyr(ppt8100, "pr", yrs8100)
 ppt0121_avg_yr <- avgRSyr(ppt0121, "pr", yrs0121)
-pet8100_avg_yr <- avgRSyr(pet8100, "pet", yrs8100)
-pet0121_avg_yr <- avgRSyr(pet0121, "pet", yrs0121)
+pet8100_avg_yr <- avgRSyr(pet8100, "pet", yrs8100) * 0.1
+pet0119_avg_yr <- avgRSyr(pet0121, "pet", yrs0119) * 0.1
 
 
 # resample to GSOC extent
@@ -284,7 +282,7 @@ ppt8100_avg_yr <- resample(readAll(ppt8100_avg_yr), gsoc2, method = "bilinear", 
 ppt0121_avg_yr <- resample(readAll(ppt0121_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
 
 pet8100_avg_yr <- resample(readAll(pet8100_avg_yr), gsoc2, method = "bilinear", progress = "text")
-pet0121_avg_yr <- resample(readAll(pet0121_avg_yr), gsoc2, method = "bilinear", progress = "text")
+pet0119_avg_yr <- resample(readAll(pet0119_avg_yr), gsoc2, method = "bilinear", progress = "text")
 
 
 # cache averages by year
@@ -293,7 +291,7 @@ pet0121_avg_yr <- resample(readAll(pet0121_avg_yr), gsoc2, method = "bilinear", 
 # writeRaster(ppt8100_avg_yr, filename = "CONUS_Prec_Stack_81-00_TC_yr.tif", overwrite = TRUE)
 # writeRaster(ppt0121_avg_yr, filename = "CONUS_Prec_Stack_01-19_TC_yr.tif", overwrite = TRUE)
 # writeRaster(pet8100_avg_yr, filename = "CONUS_PET_Stack_81-00_TC_yr.tif", overwrite = TRUE)
-# writeRaster(pet0121_avg_yr, filename = "CONUS_PET_Stack_01-19_TC_yr2.tif", overwrite = TRUE)
+# writeRaster(pet0119_avg_yr, filename = "CONUS_PET_Stack_01-19_TC_yr.tif", overwrite = TRUE)
 
 
 # load cached averages by year
@@ -439,10 +437,10 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
 su_rs <- readAll(stack(vars))
 # writeRaster(su_rs, filename = "Stack_Set_SPIN_UP_AOI.tif", format = "GTiff", progress = "text", overwrite = TRUE)
 
-su_rs <- readAll(su_rs)
 su_pts <- rasterToPoints(su_rs, spatial = TRUE, progress = "text")
-su_pts2 <- subset(su_pts, as.character(LU) %in% c(2, 3, 5, 12))
-saveRDS(su_pts, file = "su_sdf.RDS")
+su_pts2 <- subset(su_pts, as.character(LU) %in% c(2, 3, 5, 12, 13))
+saveRDS(su_pts2, file = "su_sdf.RDS")
+
 
 
 # Warm up layers
@@ -515,19 +513,22 @@ wu_pts <- do.call("rbind", wu_pts)
 # file.remove(f)
 
 
-# Forward Stack
+# Forward Run
 vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           CLAY = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
-          TEMP = "CONUS_Temp_Stack_01-19_TC_yr.tif",
-          PREC = "CONUS_Prec_Stack_228_01_19_TC.tif",
-          PET  = "CONUS_PET_Stack_228_01-19_TC.tif",
-          DR   = "CONUS_glc_shv10_DOM_DR.tif",
+          TEMP = "CONUS_Temp_Stack_01-19_TC.tif",
+          PREC = "CONUS_Prec_Stack_01-19_TC.tif",
+          PET  = "CONUS_PET_Stack_01-19_TC.tif",
           LU   = "CONUS_glc_shv10_DOM.tif",
+          DR   = "CONUS_glc_shv10_DOM_DR.tif",
           COV  = "CONUS_Cov_stack_AOI.tif"
 )
-fs_rs <- stack(vars)
-# writeRaster(fs_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
-
+fr_rs <- stack(vars)
+# writeRaster(fr_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
+fr_rs <- readAll(fr_rs)
+fr_pts <- rasterToPoints(fr_rs, spatial = TRUE, progress = "text")
+fr_pts2 <- subset(fr_pts, as.character(LU) %in% c(2, 3, 5, 12))
+saveRDS(fr_pts2, file = "fr_sdf.RDS")
 
 
 
