@@ -141,8 +141,8 @@ ri_min <- cbind(id = 1:nrow(xi_min), xi_min)
 ri_max <- cbind(id = 1:nrow(xi_max), xi_max)
 
 saveRDS(ri_r,   "su_effcts_r.rds");   rm(su_sdf, TEMP, PREC, PET, xi_r, fT_r, fW_r, fC, fPR, COV)
-saveRDS(ri_min, "wu_effcts_min.rds"); rm(su_sdf, TEMP_min, PREC_min, PET_min, xi_min, fT_min, fW_min, fC, fPR, COV)
-saveRDS(ri_max, "wu_effcts_max.rds"); 
+saveRDS(ri_min, "su_effcts_min.rds"); rm(su_sdf, TEMP, PREC, PET, xi_min, fT_min, fW_min, fC, fPR, COV)
+saveRDS(ri_max, "su_effcts_max.rds"); rm(su_sdf, TEMP, PREC, PET, xi_max, fT_max, fW_max, fC, fPR, COV)
 
 
 # # Roth C outputs
@@ -186,7 +186,7 @@ FallIOM_min <- 0.049 * SOC_min^(1.139)
 FallIOM_max <- 0.049 * SOC_max^(1.139)
 
 
-ri_min <- readRDS("wu_effcts_min.rds")
+ri_min <- readRDS("su_effcts_min.rds")
 
 
 library(parallel)
@@ -243,26 +243,26 @@ stopCluster(clus)
 
 
 # UNCERTAINTIES C input equilibrium (MAXIMUM)
-clusterExport(clus, list("ri_max", "years", "DPMptf", "RPMptf", "BIOptf", "HUMptf", "Cinputs", "carbonTurnover"))
+clusterExport(clus, list("su_df", "DR", "pClay_max", "ri_max", "FallIOM_max", "years", "carbonTurnover"))
 
 Sys.time()
-rothC_max <- parLapply(clus, 1:nrow(ri_max), function(i) {
+rothC_max <- parLapply(clus, 1:nrow(su_df), function(i) {
   
   temp <- carbonTurnover(
     tt   = years,
-    C0   = c(DPMptf, RPMptf, BIOptf, HUMptf, ri_max[i, 3]),
-    In   = Cinputs,
-    Dr   = ri_max[i, 4],
-    clay = ri_max[i, 5],
-    effcts = data.frame(years, rep(unlist(ri_max[i, 6:17]), length.out = length(years))),
+    C0   = c(0, 0, 0, 0, FallIOM_max[i]),
+    In   = 1,
+    Dr   = DR[i],
+    clay = pClay_max[i],
+    effcts = data.frame(years, rep(unlist(ri_max[i, 2:13]), length.out = length(years))),
     solver = "euler"
   )
-  temp <- c(ri_max[i, 1], unlist(temp[6000, 2:6]))
+  temp <- tail(temp, 1)
   
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_max, file = "rothC_max.rds")
+# saveRDS(rothC_max, file = "rothC_max_v2.rds")
 stopCluster(clus)
 
 
