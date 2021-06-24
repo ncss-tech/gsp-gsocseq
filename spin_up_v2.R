@@ -267,12 +267,13 @@ stopCluster(clus)
 
 
 
+
 rothC_r <- as.data.frame(
   cbind(su_df[c("ID", "x", "y")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r, LU,
         source = "r",
   do.call(
     "rbind", 
-    readRDS("rothC_r.rds")
+    readRDS("rothC_r_v2.rds")
     )))
 
 rothC_min <- as.data.frame(
@@ -280,7 +281,7 @@ rothC_min <- as.data.frame(
         source = "min",
   do.call(
     "rbind", 
-    readRDS("rothC_min.rds")
+    readRDS("rothC_min_v2.rds")
   )))
 
 rothC_max <- as.data.frame(
@@ -288,10 +289,12 @@ rothC_max <- as.data.frame(
         source = "max",
   do.call(
     "rbind", 
-    readRDS("rothC_max.rds")
+    readRDS("rothC_max_v2.rds")
   )))
 
+
 rothC_df <- rbind(rothC_r, rothC_min, rothC_max)
+
 
 rothC_df <- within(rothC_df, {
   fb_t = C1 + C2 + C3 + C4 + C5
@@ -338,7 +341,7 @@ rothC_grasses <- within(rothC_df[idx, ], {
 
 # combine
 rothC_df <- rbind(rothC_crops, rothC_trees, rothC_grasses)
-rothC_df[c("V1", "m")] <- NULL
+rothC_df[c("time", "m")] <- NULL
 
 
 # reshape
@@ -349,7 +352,8 @@ vars2 <- nm[! nm %in% vars]
 rothC_dfw <- reshape(rothC_df, direction = "wide",
                      idvar = c("ID"),
                      timevar = "source", 
-                     v.names = vars2)
+                     v.names = vars2
+                     )
  
 # convert to sf
 rothC_sf <- st_as_sf(
@@ -358,4 +362,4 @@ rothC_sf <- st_as_sf(
   crs = 4326
 )
 
-saveRDS(rothC_sf, file = "conus_su_results.rds")
+saveRDS(rothC_sf, file = "conus_su_results_v2.rds")

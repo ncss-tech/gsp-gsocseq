@@ -6,7 +6,7 @@ library(soilassessment)
 
 
 # Vectorized NPPmodel
-source("C:/workspace2/github/ncss-tech/gsp-gsocseq/NPPmodel.R")
+source("C:/workspace2/github/ncss-tech/gsp-gsocseq/functions.R")
 
 
 # Set working directory
@@ -14,31 +14,31 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 
 
 # Load warm up data
-# wu_df <- readRDS(file = "wu_pts.rds")
-# # wu_df <- wu_df[complete.cases(wu_df), ]
-# wu_sf <- st_as_sf(
-#   wu_df,
-#   coords = c("x", "y"),
-#   crs    = 4326
-#   ) %>%
-#   st_transform(crs = 5070)
-# wu_df <- cbind(round(st_coordinates(wu_sf)), st_drop_geometry(wu_sf))
-# wu_df$xy <- paste0(wu_df$X, wu_df$Y, sep = "_")
-# 
-# # idx <- 1:nrow(wu_df)
-# # idx <- as.integer(cut(idx, breaks = quantile(idx, probs = seq(0, 1, 0.2)), include.lowest = TRUE))
-# # wu_df <- wu_df[idx == 2, ]
-# rm(wu_sf)
+wu_df <- readRDS(file = "wu_pts.rds")
+wu_df <- wu_df[complete.cases(wu_df), ]
+wu_sf <- st_as_sf(
+  wu_df,
+  coords = c("x", "y"),
+  crs    = 4326
+  ) %>%
+  st_transform(crs = 5070)
+wu_df <- cbind(round(st_coordinates(wu_sf)), st_drop_geometry(wu_sf))
+wu_df$xy <- paste(wu_df$X, wu_df$Y, sep = "_")
+
+idx <- 1:nrow(wu_df)
+# idx <- as.integer(cut(idx, breaks = quantile(idx, probs = seq(0, 1, 0.2)), include.lowest = TRUE))
+# wu_df <- wu_df[idx == 2, ]
+rm(wu_sf)
 
 # Load spin up results
-# su_sf <- readRDS(file = "conus_su_results.rds")
+# su_sf <- readRDS(file = "conus_su_results_v2.rds")
 # su_vars <- names(su_sf)
 # su_sf <- st_transform(su_sf, crs = 5070)
 # su_df <- cbind(round(st_coordinates(su_sf)), st_drop_geometry(su_sf))
-# su_df$xy <- paste0(su_df$X, su_df$Y, sep = "_")
+# su_df$xy <- paste(su_df$X, su_df$Y, sep = "_")
 # saveRDS(su_df, "conus_su_results_v2.rds")
-# su_df <- readRDS("conus_su_results_v2.rds")
 # rm(su_sf)
+su_df <- readRDS("conus_su_results_v2.rds")
 
 # combine
 # wu_df <- merge(wu_df, su_df, by = "xy", all.x = TRUE)
@@ -84,18 +84,18 @@ PREC_sum_max <- PREC_sum * 1.05
 
 
 # Apply NPP coeficientes
-NPP_rv <- (
-  LU == 2 | LU == 12 | LU == 13)           * NPP_rv  * 0.53 + 
-  (LU == 4)                                * NPP_rv  * 0.88 + 
-  (LU == 3 | LU == 5  | LU == 6 | LU == 8) * NPP_rv  * 0.72
-NPP_min <- (
-  LU == 2 | LU == 12 | LU == 13)           * NPP_min * 0.53 + 
-  (LU == 4)                                * NPP_min * 0.88 + 
-  (LU == 3 | LU == 5  | LU == 6 | LU == 8) * NPP_min * 0.72
-NPP_max <- (
-  LU == 2  | LU == 12 | LU == 13)          * NPP_max * 0.53 + 
-  (LU == 4)                                * NPP_max * 0.88 + 
-  (LU == 3 | LU == 5  | LU == 6 | LU == 8) * NPP_max * 0.72
+# NPP_rv <- (
+#   LU == 2 | LU == 12 | LU == 13)           * NPP_rv  * 0.53 + 
+#   (LU == 4)                                * NPP_rv  * 0.88 + 
+#   (LU == 3 | LU == 5  | LU == 6 | LU == 8) * NPP_rv  * 0.72
+# NPP_min <- (
+#   LU == 2 | LU == 12 | LU == 13)           * NPP_min * 0.53 + 
+#   (LU == 4)                                * NPP_min * 0.88 + 
+#   (LU == 3 | LU == 5  | LU == 6 | LU == 8) * NPP_min * 0.72
+# NPP_max <- (
+#   LU == 2  | LU == 12 | LU == 13)          * NPP_max * 0.53 + 
+#   (LU == 4)                                * NPP_max * 0.88 + 
+#   (LU == 3 | LU == 5  | LU == 6 | LU == 8) * NPP_max * 0.72
 
 
 NPP_M     <- sapply(1:ncol(PREC_sum), function(i) {
@@ -148,8 +148,8 @@ saveRDS(C_max, "wu_C_max.rds")
 
 
 rm(wu_df)
-rm(PREC_sum, PREC_sum_min, PREC_sum_max)
-rm(TEMP_avg, TEMP_avg_min, TEMP_avg_max)
+rm(PREC, PREC_sum, PREC_sum_min, PREC_sum_max)
+rm(TEMP, TEMP_avg, TEMP_avg_min, TEMP_avg_max)
 rm(NPP_M, NPP_M_min, NPP_M_max)
 rm(C_rv, C_min, C_max)
 
@@ -207,6 +207,7 @@ TEMP <- wu_df[grepl("_tmmx$", names(wu_df))]
 PREC <- wu_df[grepl("_pr$", names(wu_df))]
 PET  <- wu_df[grepl("_pet$",  names(wu_df))]
 COV  <- wu_df[grepl("^CON_",  names(wu_df))]
+LU   <- wu_df$CONUS_glc_shv10_DOM
 rm(wu_df)
 
 
@@ -274,6 +275,10 @@ years <- seq(1 / 12, 1, by = 1 / 12)
 
 su_df <- readRDS("su_df.rds")
 
+pClay_r   <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt
+pClay_min <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt * 0.9
+pClay_max <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt * 1.1
+
 xi_r   <- readRDS("wu_effcts_r.rds")
 xi_min <- readRDS("wu_effcts_min.rds")
 xi_max <- readRDS("wu_effcts_max.rds")
@@ -282,100 +287,71 @@ C_rv  <- readRDS("wu_C_rv.rds")
 C_min <- readRDS("wu_C_min.rds")
 C_max <- readRDS("wu_C_max.rds")
 
-DR   <- su_df$CONUS_glc_shv10_DOM_DR
-
 
 library(parallel)
 
-clus <- makeCluster(7)
-
 # C input equilibrium. (Ceq) ----
-clusterExport(clus, list("su_df", "C_rv", "DR", "xi_r", "years", "carbonTurnover"))
+#su_df <- su_df[1:200, ]; C_rv <- C_rv[1:200, ]; xi_r <- xi_r[1:200, ]
+
+clus <- makeCluster(7)
+clusterExport(clus, list("su_df", "C_rv", "xi_r", "years", "carbonTurnover", "rothC_wu"))
 
 Sys.time()
-rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
-  
-  temp <- carbonTurnover(
-    tt   = years,
-    C0   = c(su_df[i, ]$DPM_p.r, su_df[i, ]$RPM_p.r, su_df[i, ]$BIO_p.r, su_df[i, ]$HUM_p.r, su_df[i, ]$FallIOM.r),
-    In   = C_rv[i, 1],
-    Dr   = DR[i],
-    clay = su_df[i, ]$CONUS_gnatsgo_fy20_1km_clay_wt,
-    effcts = data.frame(years, rep(unlist(xi_r[i, 2:229]), length.out = length(years))),
-    solver = "euler"
-  )
-  fp <- list(tail(temp, 1)[-1])
-  
-  for (j in 2:19) {
-    temp <- carbonTurnover(
-      tt   = years,
-      C0   = c(fp[[1]][1], fp[[1]][2], fp[[1]][3], fp[[1]][4], fp[[1]][5]),
-      In   = C_rv[i, j],
-      Dr   = DR[i],
-      clay = su_df[i, ]$CONUS_gnatsgo_fy20_1km_clay_wt,
-      effcts = data.frame(years, rep(unlist(xi_r[i, 2:229]), length.out = length(years))),
-      solver = "euler"
-    )
-    fp[[1]] <- tail(temp, 1)[-1]
-  }
-  
-  fp <- unlist(fp)
-  
-  return(fp)
-})
+rothC_r <- rothC_wu(
+  time = years,
+  su_df = su_df, pClay_var = "pClay.r", C0_vars = c("DPM_p.r", "RPM_p.r", "BIO_p.r", "HUM_p.r", "FallIOM.r"), DR_var = "CONUS_glc_shv10_DOM_DR", 
+  C_m = C_rv,
+  xi_df = xi_r
+)
 Sys.time()
 # saveRDS(rothC_r, file = "rothC_r_wu.rds")
 stopCluster(clus)
 
 
+
 # rerun on negative values using a different solver
 rc_wu <- readRDS(file = "rothC_r_wu.rds")
 rc_wu <- as.data.frame(do.call("rbind", rc_wu))
-idx <- which(apply(rc_wu, 1, function(x) any(x < 0)))
+idx <- which(apply(rc_wu, 1, function(x) any(x < 0 & !is.na(x))))
 
-su_df <- su_df[idx, ]
+su_df <- su_df[idx, ];
 C_rv  <- C_rv[idx, ]
-DR    <- DR[idx]
 xi_r  <- xi_r[idx, ]
 
 
 library(parallel)
 clus <- makeCluster(15)
-clusterExport(clus, list("idx", "su_df", "C_rv", "DR", "xi_r", "years", "RothCModel", "getC"))
+clusterExport(clus, list("idx", "su_df", "C_rv", "xi_r", "years", "RothCModel", "getC", rothC_wu_nn))
+
 Sys.time()
-rothC_r_nn <- parLapply(clus, 1:nrow(su_df), function(i) {
-  
-  temp <- RothCModel(
-    t    = years,
-    C0   = c(su_df[i, ]$DPM_p.r, su_df[i, ]$RPM_p.r, su_df[i, ]$BIO_p.r, su_df[i, ]$HUM_p.r, su_df[i, ]$FallIOM.r),
-    In   = C_rv[i, 1],
-    DR   = DR[i],
-    clay = su_df[i, ]$CONUS_gnatsgo_fy20_1km_clay_wt,
-    xi   = data.frame(years, rep(unlist(xi_r[i, 2:229]), length.out = length(years))),
-    pass = TRUE
-  )
-  fp <- list(tail(getC(temp), 1))
-  
-  for (j in 2:19) {
-    temp <- RothCModel(
-      t    = years,
-      C0   = c(fp[[1]][1], fp[[1]][2], fp[[1]][3], fp[[1]][4], fp[[1]][5]),
-      In   = C_rv[i, j],
-      DR   = DR[i],
-      clay = su_df[i, ]$CONUS_gnatsgo_fy20_1km_clay_wt,
-      xi   = data.frame(years, rep(unlist(xi_r[i, 2:229]), length.out = length(years))),
-      pass = TRUE
-    )
-    fp[[1]] <- tail(getC(temp), 1)
-  }
-  
-  fp <- unlist(fp)
-  
-  return(fp)
-})
+rothC_r_nn <- rothC_wu_nn(
+  time = years,
+  su_df = su_df, pClay_var = "pClay.r", C0_vars = c("DPM_p.r", "RPM_p.r", "BIO_p.r", "HUM_p.r", "FallIOM.r"), DR_var = "CONUS_glc_shv10_DOM_DR", 
+  C_m = C_rv,
+  xi_df = xi_r
+)
 Sys.time()
 # saveRDS(rothC_r_nn, file = "rothC_r_wu_nonneg.rds")
 stopCluster(clus)
+
+
+
+
+# Cmin input equilibrium. (Ceq) ----
+clus <- makeCluster(7)
+clusterExport(clus, list("su_df", "C_min", "xi_min", "years", "carbonTurnover", "rothC_wu"))
+
+Sys.time()
+rothC_min <- rothC_wu(
+  time = years,
+  su_df = su_df, pClay_var = "pClay.min", C0_vars = c("DPM_p.min", "RPM_p.min", "BIO_p.min", "HUM_p.min", "FallIOM.min"), DR_var = "CONUS_glc_shv10_DOM_DR", 
+  C_m = C_min,
+  xi_df = xi_min
+)
+Sys.time()
+# saveRDS(rothC_min, file = "rothC_min_wu.rds")
+stopCluster(clus)
+
 
 
 
