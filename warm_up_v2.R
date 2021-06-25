@@ -15,38 +15,40 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 
 # Load warm up data
 wu_df <- readRDS(file = "wu_pts.rds")
-wu_df <- wu_df[complete.cases(wu_df), ]
 wu_sf <- st_as_sf(
   wu_df,
   coords = c("x", "y"),
   crs    = 4326
   ) %>%
   st_transform(crs = 5070)
-wu_df <- cbind(round(st_coordinates(wu_sf)), st_drop_geometry(wu_sf))
+wu_df    <- cbind(round(st_coordinates(wu_sf)), st_drop_geometry(wu_sf))
+wu_df    <- wu_df[complete.cases(wu_df), ]
 wu_df$xy <- paste(wu_df$X, wu_df$Y, sep = "_")
+rm(wu_sf)
 
 idx <- 1:nrow(wu_df)
 # idx <- as.integer(cut(idx, breaks = quantile(idx, probs = seq(0, 1, 0.2)), include.lowest = TRUE))
 # wu_df <- wu_df[idx == 2, ]
-rm(wu_sf)
+
 
 # Load spin up results
-# su_sf <- readRDS(file = "conus_su_results_v2.rds")
-# su_vars <- names(su_sf)
-# su_sf <- st_transform(su_sf, crs = 5070)
-# su_df <- cbind(round(st_coordinates(su_sf)), st_drop_geometry(su_sf))
+# su_df <- readRDS(file = "conus_su_results_v2.rds")
+# su_df <- st_transform(su_df, crs = 5070)
+# su_df <- cbind(round(st_coordinates(su_df)), st_drop_geometry(su_df))
 # su_df$xy <- paste(su_df$X, su_df$Y, sep = "_")
-# saveRDS(su_df, "conus_su_results_v2.rds")
-# rm(su_sf)
-su_df <- readRDS("conus_su_results_v2.rds")
+# saveRDS(su_df, "conus_su_results_v3.rds")
+su_df <- readRDS("conus_su_results_v3.rds")
+su_vars <- names(su_df)
+
 
 # combine
 # wu_df <- merge(wu_df, su_df, by = "xy", all.x = TRUE)
-# rm(su_df)
 # saveRDS(wu_df, "wu_df.rds")
 # 
-# vars <- c("X.y", "Y.y", "ID.y", "CONUS_gnatsgo_fy20_1km_clay_wt", "CONUS_glc_shv10_DOM_DR", su_vars[c(-1, -48)])
-# saveRDS(wu_df[vars], "su_df.rds")
+# vars <- c("X.y", "Y.y", "ID.y", "CONUS_gnatsgo_fy20_1km_clay_wt", "CONUS_glc_shv10_DOM_DR", su_vars[c(-1, -2, -3, -50)])
+# su_df <- wu_df[vars]
+# saveRDS(su_df, "su_df.rds")
+# rm(su_df)
 
 wu_df <- readRDS("wu_df.rds")
 
@@ -270,6 +272,7 @@ saveRDS(xi_max, "wu_effcts_max.rds"); rm(xi_max, fW_max, fT_max, fC, fPR)
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
+# load inputs ----
 nSim  <- raster::nlayers(raster::stack("CONUS_Temp_Stack_228_01_19_TC.tif")) / 12
 years <- seq(1 / 12, 1, by = 1 / 12)
 
@@ -310,30 +313,28 @@ stopCluster(clus)
 
 
 # rerun on negative values using a different solver
-rc_wu <- readRDS(file = "rothC_r_wu.rds")
-rc_wu <- as.data.frame(do.call("rbind", rc_wu))
-idx <- which(apply(rc_wu, 1, function(x) any(x < 0 & !is.na(x))))
+rc_wu <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu.rds")))
+idx <- which(apply(rc_wu, 1, function(x) any(x < 0)))
 
-su_df <- su_df[idx, ];
-C_rv  <- C_rv[idx, ]
-xi_r  <- xi_r[idx, ]
+su_df <- readRDS("su_df.rds")[idx, ]
+C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
+xi_r  <- readRDS("wu_effcts_r.rds")[idx, ]
 
 
 library(parallel)
 clus <- makeCluster(15)
-clusterExport(clus, list("idx", "su_df", "C_rv", "xi_r", "years", "RothCModel", "getC", rothC_wu_nn))
+clusterExport(clus, list("idx", "su_df", "C_rv", "xi_r", "years", "RothCModel", "getC", "rothC_wu"))
 
 Sys.time()
 rothC_r_nn <- rothC_wu_nn(
-  time = years,
+  time  = years,
   su_df = su_df, pClay_var = "pClay.r", C0_vars = c("DPM_p.r", "RPM_p.r", "BIO_p.r", "HUM_p.r", "FallIOM.r"), DR_var = "CONUS_glc_shv10_DOM_DR", 
-  C_m = C_rv,
+  C_m   = C_rv,
   xi_df = xi_r
 )
 Sys.time()
 # saveRDS(rothC_r_nn, file = "rothC_r_wu_nonneg.rds")
 stopCluster(clus)
-
 
 
 
@@ -353,36 +354,133 @@ Sys.time()
 stopCluster(clus)
 
 
+# rerun on negative values using a different solver
+rc_min_wu <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu.rds")))
+idx <- which(apply(rc_min_wu, 1, function(x) any(x < 0)))
+
+# reload the following data from above if necessary
+su_df  <- readRDS("su_df.rds")[idx, ]
+C_min  <- readRDS("wu_C_min.rds")[idx, ]
+xi_min <- readRDS("wu_effcts_min.rds")[idx, ]
 
 
-# Combine outputs ----
-rc_wu    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu.rds")))
-rc_wu_nn <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu_nonneg.rds")))
+library(parallel)
+clus <- makeCluster(15)
+clusterExport(clus, list("idx", "su_df", "C_min", "xi_min", "years", "RothCModel", "getC", "rothC_wu_nn"))
+
+Sys.time()
+rothC_r_nn <- rothC_wu_nn(
+  time = years,
+  su_df = su_df, pClay_var = "pClay.min", C0_vars = c("DPM_p.min", "RPM_p.min", "BIO_p.min", "HUM_p.min", "FallIOM.min"), DR_var = "CONUS_glc_shv10_DOM_DR", 
+  C_m = C_min,
+  xi_df = xi_min
+)
+Sys.time()
+# saveRDS(rothC_r_nn, file = "rothC_min_wu_nonneg.rds")
+stopCluster(clus)
+
+
+
+# Cmax input equilibrium. (Ceq) ----
+clus <- makeCluster(7)
+clusterExport(clus, list("su_df", "C_max", "xi_max", "years", "carbonTurnover", "rothC_wu"))
+
+Sys.time()
+rothC_max <- rothC_wu(
+  time = years,
+  su_df = su_df,  
+  C0_vars = c("DPM_p.max", "RPM_p.max", "BIO_p.max", "HUM_p.max", "FallIOM.max"), 
+  pClay_var = "pClay.max",
+  DR_var = "CONUS_glc_shv10_DOM_DR", 
+  C_m = C_max,
+  xi_df = xi_max
+)
+Sys.time()
+# saveRDS(rothC_max, file = "rothC_max_wu.rds")
+stopCluster(clus)
+
+
+# rerun on negative values using a different solver
+rc_max_wu <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds")))
+idx <- which(apply(rc_max_wu, 1, function(x) any(x < 0)))
+
+
+# reload the following data from above if necessary
+su_df  <- readRDS("su_df.rds")[idx, ]
+C_max  <- readRDS("wu_C_max.rds")[idx, ]
+xi_max <- readRDS("wu_effcts_max.rds")[idx, ]
+
+
+library(parallel)
+clus <- makeCluster(15)
+clusterExport(clus, list("idx", "su_df", "C_max", "xi_max", "years", "RothCModel", "getC", "rothC_wu_nn"))
+
+Sys.time()
+rothC_max_nn <- rothC_wu_nn(
+  time  = years,
+  su_df = su_df, pClay_var = "pClay.max", C0_vars = c("DPM_p.max", "RPM_p.max", "BIO_p.max", "HUM_p.max", "FallIOM.max"), DR_var = "CONUS_glc_shv10_DOM_DR", 
+  C_m   = C_max,
+  xi_df = xi_max
+)
+Sys.time()
+# saveRDS(rothC_max_nn, file = "rothC_max_wu_nonneg.rds")
+stopCluster(clus)
+
+
+
+# load rothC outputs ----
+rc_wu_r    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu.rds")))
+rc_wu_r_nn <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu_nonneg.rds")))
+
+rc_wu_min     <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu.rds")))
+rc_wu_min_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu_nonneg.rds")))
+
+rc_wu_max     <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds")))
+rc_wu_max_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu_nonneg.rds")))
+
 su_df    <- readRDS("su_df.rds")
 
 
 # replace
-idx <- which(apply(rc_wu, 1, function(x) any(x < 0)))
-rc_wu[idx, ] <- rc_wu_nn
+idx <- which(apply(rc_wu_r, 1,   function(x) any(x < 0)))
+rc_wu_r[idx, ] <- rc_wu_r_nn
+
+idx <- which(apply(rc_wu_min, 1, function(x) any(x < 0)))
+rc_wu_min[idx, ] <- rc_wu_min_nn
+rc_wu_min <- cbind(19, rc_wu_min)
+names(rc_wu_min) <- paste0("V", 1:6)
+
+idx <- which(apply(rc_wu_max, 1, function(x) any(x < 0)))
+rc_wu_max[idx, ] <- rc_wu_max_nn
 
 
 # check
-format(summary(rc_wu), big.mark = ",", scientific = FALSE)
-sum(apply(rc_wu, 1, function(x) any(x < 0)))
+format(summary(rc_wu_r), big.mark = ",", scientific = FALSE)
+sum(apply(rc_wu_r, 1, function(x) any(x < 0)))
 
 
 # combine
 names(su_df)[1:3] <- c("X", "Y", "ID")
 vars <- c("X", "Y", "ID", "SOC.r", "Ceq.r")
 
-rc_wu <- cbind(
-  su_df[vars],
-  SOC_t0 = rowSums(rc_wu),
-  rc_wu
-  )
-names(rc_wu)[7:11] <- c("DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
+
+rc_wu_all <- rbind(
+  cbind(rc_wu_r,   source = "r",   id = 1:nrow(rc_wu_r)),
+  cbind(rc_wu_min, source = "min", id = 1:nrow(rc_wu_r)),
+  cbind(rc_wu_max, source = "max", id = 1:nrow(rc_wu_r))
+)
+rc_wu_all$SOC_t0 <- rowSums(rc_wu_r[2:6])
+names(rc_wu_all)[1:6] <- c("time", "DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
+
+rc_wu_all <- reshape(rc_wu_all, direction = "wide",
+                     idvar = c("id"),
+                     timevar = "source", 
+                     v.names = names(rc_wu_all[1:6])
+)
+
+rc_wu_all <- cbind(su_df[vars], rc_wu_all)
 
 
 # save final results
-saveRDS(rc_wu, file = "rothC_r_wu_final.rds")
+saveRDS(rc_wu_all, file = "rothC_r_wu_final.rds")
 
