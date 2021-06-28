@@ -466,11 +466,10 @@ sum(apply(rc_wu_r, 1, function(x) any(x < 0)))
 names(su_df)[1:3] <- c("X", "Y", "ID")
 vars <- c("X", "Y", "ID", "SOC.r", "Ceq.r")
 
-
 rc_wu_all <- rbind(
-  cbind(source = "r",   id = 1:nrow(rc_wu_r),   Cinput = C_rv[19],  CinputFOWARD = rowMeans(C_rv),  rc_wu_r),
-  cbind(source = "min", id = 1:nrow(rc_wu_min), Cinput = C_min[19], CinputFOWARD = rowMeans(C_min), rc_wu_min),
-  cbind(source = "max", id = 1:nrow(rc_wu_max), Cinput = C_max[19], CinputFOWARD = rowMeans(C_max), rc_wu_max)
+  cbind(source = "r",   id = 1:nrow(rc_wu_r),   Cinput = C_rv[19],  CinputFORWARD = rowMeans(C_rv),  rc_wu_r),
+  cbind(source = "min", id = 1:nrow(rc_wu_min), Cinput = C_min[19], CinputFORWARD = rowMeans(C_min), rc_wu_min),
+  cbind(source = "max", id = 1:nrow(rc_wu_max), Cinput = C_max[19], CinputFORWARD = rowMeans(C_max), rc_wu_max)
 )
 rc_wu_all$SOC_t0 <- rowSums(rc_wu_all[5:10])
 names(rc_wu_all)[5:10] <- c("time", "DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
