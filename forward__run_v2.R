@@ -54,7 +54,9 @@ High_PaddyFields <- 1.2
 
 # apply increase
 fr_df <- within(fr_df, {
+    Ceq.r_min <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), Ceq.r * 1.05, Ceq.r)
     Ceq.r_med <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), Ceq.r * 1.10, Ceq.r)
+    Ceq.r_max <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), Ceq.r * 1.20, Ceq.r)
 })
 
 
@@ -68,6 +70,7 @@ PREC    <- fr_df[grepl("PREC_", names(fr_df))]
 PET     <- fr_df[grepl("PET_",  names(fr_df))]
 COV     <- fr_df[grepl("COV_",  names(fr_df))]
 LU      <- fr_df$LU
+
 
 # Moisture effects per month ----
 fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
@@ -194,7 +197,7 @@ rothC_r <- parLapply(clus, 1:nrow(fr_df), function(i) {
     
     temp <- carbonTurnover(
         tt   = years,
-        C0   = c(fr_df$DPM_wu[i], fr_df$RPM_wu[i], fr_df$BIO_wu[i], fr_df$HUM_wu[i], fr_df$IOM_wu[i]),
+        C0   = c(fr_df$DPM_wu.r[i], fr_df$RPM_wu.r[i], fr_df$BIO_wu.r[i], fr_df$HUM_wu.r[i], fr_df$IOM_wu.r[i]),
         In   = fr_df$Ceq.r[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY[i],
@@ -204,6 +207,56 @@ rothC_r <- parLapply(clus, 1:nrow(fr_df), function(i) {
     fp <- tail(temp, 1)
 })
 Sys.time()
-saveRDS(rothC_r, file = "rothC_r_fr.rds")
+# saveRDS(rothC_r, file = "rothC_r_fr.rds")
 stopCluster(clus)
+
+
+
+# bau ----
+clusterExport(clus, list("fr_df", "xi_min", "years", "carbonTurnover"))
+
+Sys.time()
+rothC_fr_bau <- parLapply(clus, 1:nrow(fr_df), function(i) {
+    
+    temp <- carbonTurnover(
+        tt   = years,
+        C0   = c(fr_df$DPM_wu.r[i], fr_df$RPM_wu.r[i], fr_df$BIO_wu.r[i], fr_df$HUM_wu.r[i], fr_df$IOM_wu.r[i]),
+        In   = fr_df$Ceq.min[i],
+        Dr   = fr_df$DR[i],
+        clay = fr_df$CLAY[i],
+        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        solver = "euler"
+    )
+    fp <- tail(temp, 1)
+})
+Sys.time()
+# saveRDS(rothC_fr_bau, file = "rothC_fr_bau.rds")
+stopCluster(clus)
+
+
+# bau min ----
+rothC_fr_bau_min <- parLapply(clus, 1:nrow(fr_df), function(i) {
+    
+    temp <- carbonTurnover(
+        tt   = years,
+        C0   = c(fr_df$DPM_wu.r[i], fr_df$RPM_wu.r[i], fr_df$BIO_wu.r[i], fr_df$HUM_wu.r[i], fr_df$IOM_wu.r[i]),
+        In   = fr_df$Ceq.min[i],
+        Dr   = fr_df$DR[i],
+        clay = fr_df$CLAY[i],
+        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        solver = "euler"
+    )
+    fp <- tail(temp, 1)
+})
+Sys.time()
+# saveRDS(rothC_fr_bau, file = "rothC_fr_bau.rds")
+
+f_bau_min<-Roth_C(Cinputs=Cinputs_min,years=years,DPMptf=WARM_UP[i,12], RPMptf=WARM_UP[i,13], BIOptf=WARM_UP[i,14], HUMptf=WARM_UP[i,15], FallIOM=WARM_UP[i,16],Temp=Temp*1.02,Precip=Precip*0.95,Evp=Evp,Cov=Cov,Cov1=Cov1,Cov2=Cov2,soil.thick=soil.thick,SOC=SOC*0.8,clay=clay*0.9,DR=DR,bare1=bare1,LU=LU)
+f_bau_t_min<-f_bau_min[1]+f_bau_min[2]+f_bau_min[3]+f_bau_min[4]+f_bau_min[5]
+
+#Unc BAU maximum
+
+f_bau_max<-Roth_C(Cinputs=Cinputs_max,years=years,DPMptf=WARM_UP[i,18], RPMptf=WARM_UP[i,19], BIOptf=WARM_UP[i,20], HUMptf=WARM_UP[i,21], FallIOM=WARM_UP[i,22],Temp=Temp*0.98,Precip=Precip*1.05,Evp=Evp,Cov=Cov,Cov1=Cov1,Cov2=Cov2,soil.thick=soil.thick,SOC=SOC*1.2,clay=clay*1.1,DR=DR,bare1=bare1,LU=LU)
+f_bau_t_max<-f_bau_max[1]+f_bau_max[2]+f_bau_max[3]+f_bau_max[4]+f_bau_max[5]
+
 

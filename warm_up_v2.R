@@ -428,7 +428,7 @@ stopCluster(clus)
 
 
 
-# load rothC outputs ----
+# load rothC outputs, C inputs and spin-up results ----
 rc_wu_r    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu.rds")))
 rc_wu_r_nn <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu_nonneg.rds")))
 
@@ -438,20 +438,23 @@ rc_wu_min_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu_non
 rc_wu_max     <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds")))
 rc_wu_max_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu_nonneg.rds")))
 
+C_rv  <- readRDS("wu_C_rv.rds")
+C_min <- readRDS("wu_C_min.rds")
+C_max <- readRDS("wu_C_max.rds")
+
 su_df    <- readRDS("su_df.rds")
 
 
 # replace
 idx <- which(apply(rc_wu_r, 1,   function(x) any(x < 0)))
-rc_wu_r[idx, ] <- rc_wu_r_nn
+rc_wu_r[idx, -1] <- rc_wu_r_nn
 
+rc_wu_min <- cbind(19, rc_wu_min); names(rc_wu_min) <- paste0("V", 1:6) # fix
 idx <- which(apply(rc_wu_min, 1, function(x) any(x < 0)))
-rc_wu_min[idx, ] <- rc_wu_min_nn
-rc_wu_min <- cbind(19, rc_wu_min)
-names(rc_wu_min) <- paste0("V", 1:6)
+rc_wu_min[idx, -1] <- rc_wu_min_nn
 
 idx <- which(apply(rc_wu_max, 1, function(x) any(x < 0)))
-rc_wu_max[idx, ] <- rc_wu_max_nn
+rc_wu_max[idx, -1] <- rc_wu_max_nn
 
 
 # check
@@ -465,19 +468,18 @@ vars <- c("X", "Y", "ID", "SOC.r", "Ceq.r")
 
 
 rc_wu_all <- rbind(
-  cbind(rc_wu_r,   source = "r",   id = 1:nrow(rc_wu_r)),
-  cbind(rc_wu_min, source = "min", id = 1:nrow(rc_wu_r)),
-  cbind(rc_wu_max, source = "max", id = 1:nrow(rc_wu_r))
+  cbind(source = "r",   id = 1:nrow(rc_wu_r),   Cinput = C_rv[19],  CinputFOWARD = rowMeans(C_rv),  rc_wu_r),
+  cbind(source = "min", id = 1:nrow(rc_wu_min), Cinput = C_min[19], CinputFOWARD = rowMeans(C_min), rc_wu_min),
+  cbind(source = "max", id = 1:nrow(rc_wu_max), Cinput = C_max[19], CinputFOWARD = rowMeans(C_max), rc_wu_max)
 )
-rc_wu_all$SOC_t0 <- rowSums(rc_wu_r[2:6])
-names(rc_wu_all)[1:6] <- c("time", "DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
+rc_wu_all$SOC_t0 <- rowSums(rc_wu_all[5:10])
+names(rc_wu_all)[5:10] <- c("time", "DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
 
 rc_wu_all <- reshape(rc_wu_all, direction = "wide",
                      idvar = c("id"),
                      timevar = "source", 
-                     v.names = names(rc_wu_all[1:6])
+                     v.names = names(rc_wu_all[c(3, 4, 6:11)])
 )
-
 rc_wu_all <- cbind(su_df[vars], rc_wu_all)
 
 
