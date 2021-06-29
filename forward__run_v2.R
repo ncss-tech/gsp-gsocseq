@@ -52,7 +52,7 @@ Med_PaddyFields  <- 1.10
 High_PaddyFields <- 1.2
 
 
-# apply increase
+# apply increase ----
 fr_df <- within(fr_df, {
     CinputFORWARD_low     <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), CinputFORWARD.r    * 1.05,        CinputFORWARD.r)
     CinputFORWARD_med     <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), CinputFORWARD.r   * 1.10,        CinputFORWARD.r)
@@ -182,8 +182,8 @@ years <- seq(1 / 12, 20, by = 1 / 12)
 
 fr_df <- readRDS("fr_df.rds")
 fr_df <- fr_df[!grepl("TEMP_|PREC_|PET_|COV_", names(fr_df))]
-fr_df$Clay_min <- fr_df$CLAY * 0.9
-fr_df$Clay_max <- fr_df$CLAY * 1.1
+fr_df$CLAY_min <- fr_df$CLAY * 0.9
+fr_df$CLAY_max <- fr_df$CLAY * 1.1
 
 xi_r   <- readRDS("fr_effcts_r.rds")
 xi_min <- readRDS("fr_effcts_min.rds")
@@ -193,7 +193,7 @@ xi_max <- readRDS("fr_effcts_max.rds")
 library(parallel)
 
 
-# C input equilibrium. (Ceq) ----
+# Cinput bau ----
 clus <- makeCluster(10)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
@@ -217,7 +217,7 @@ stopCluster(clus)
 
 
 
-# bau min ----
+# Cinput bau min ----
 clus <- makeCluster(10)
 clusterExport(clus, list("fr_df", "xi_min", "years", "carbonTurnover"))
 
@@ -229,7 +229,7 @@ rothC_fr_bau_min <- parLapply(clus, 1:nrow(fr_df), function(i) {
         C0   = c(fr_df$DPM_wu.min[i], fr_df$RPM_wu.min[i], fr_df$BIO_wu.min[i], fr_df$HUM_wu.min[i], fr_df$IOM_wu.min[i]),
         In   = fr_df$CinputFORWARD.min[i],
         Dr   = fr_df$DR[i],
-        clay = fr_df$Clay_min[i],
+        clay = fr_df$CLAY_min[i],
         effcts = data.frame(years, rep(unlist(xi_min[i, 2:13]), length.out = length(years))),
         solver = "euler"
     )
@@ -240,7 +240,7 @@ Sys.time()
 stopCluster(clus)
 
 
-# bau min ----
+# Cinput bau max ----
 clus <- makeCluster(10)
 clusterExport(clus, list("fr_df", "xi_max", "years", "carbonTurnover"))
 
@@ -252,7 +252,7 @@ rothC_fr_bau_max <- parLapply(clus, 1:nrow(fr_df), function(i) {
         C0   = c(fr_df$DPM_wu.max[i], fr_df$RPM_wu.max[i], fr_df$BIO_wu.max[i], fr_df$HUM_wu.max[i], fr_df$IOM_wu.max[i]),
         In   = fr_df$CinputFORWARD.max[i],
         Dr   = fr_df$DR[i],
-        clay = fr_df$Clay_max[i],
+        clay = fr_df$CLAY_max[i],
         effcts = data.frame(years, rep(unlist(xi_max[i, 2:13]), length.out = length(years))),
         solver = "euler"
     )
@@ -263,12 +263,71 @@ Sys.time()
 stopCluster(clus)
 
 
-f_bau_min<-Roth_C(Cinputs=Cinputs_min,years=years,DPMptf=WARM_UP[i,12], RPMptf=WARM_UP[i,13], BIOptf=WARM_UP[i,14], HUMptf=WARM_UP[i,15], FallIOM=WARM_UP[i,16],Temp=Temp*1.02,Precip=Precip*0.95,Evp=Evp,Cov=Cov,Cov1=Cov1,Cov2=Cov2,soil.thick=soil.thick,SOC=SOC*0.8,clay=clay*0.9,DR=DR,bare1=bare1,LU=LU)
-f_bau_t_min<-f_bau_min[1]+f_bau_min[2]+f_bau_min[3]+f_bau_min[4]+f_bau_min[5]
 
-#Unc BAU maximum
+# Cinput low ----
+clus <- makeCluster(10)
+clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
-f_bau_max<-Roth_C(Cinputs=Cinputs_max,years=years,DPMptf=WARM_UP[i,18], RPMptf=WARM_UP[i,19], BIOptf=WARM_UP[i,20], HUMptf=WARM_UP[i,21], FallIOM=WARM_UP[i,22],Temp=Temp*0.98,Precip=Precip*1.05,Evp=Evp,Cov=Cov,Cov1=Cov1,Cov2=Cov2,soil.thick=soil.thick,SOC=SOC*1.2,clay=clay*1.1,DR=DR,bare1=bare1,LU=LU)
-f_bau_t_max<-f_bau_max[1]+f_bau_max[2]+f_bau_max[3]+f_bau_max[4]+f_bau_max[5]
+Sys.time()
+rothC_fr_low <- parLapply(clus, 1:nrow(fr_df), function(i) {
+    
+    temp <- carbonTurnover(
+        tt   = years,
+        C0   = c(fr_df$DPM_wu.r[i], fr_df$RPM_wu.r[i], fr_df$BIO_wu.r[i], fr_df$HUM_wu.r[i], fr_df$IOM_wu.r[i]),
+        In   = fr_df$CinputFORWARD_low[i],
+        Dr   = fr_df$DR[i],
+        clay = fr_df$CLAY[i],
+        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        solver = "euler"
+    )
+    fp <- tail(temp, 1)
+})
+Sys.time()
+# saveRDS(rothC_fr_low, file = "rothC_fr_low.rds")
+stopCluster(clus)
 
 
+# Cinput med ----
+clus <- makeCluster(10)
+clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
+
+Sys.time()
+rothC_fr_med <- parLapply(clus, 1:nrow(fr_df), function(i) {
+    
+    temp <- carbonTurnover(
+        tt   = years,
+        C0   = c(fr_df$DPM_wu.r[i], fr_df$RPM_wu.r[i], fr_df$BIO_wu.r[i], fr_df$HUM_wu.r[i], fr_df$IOM_wu.r[i]),
+        In   = fr_df$CinputFORWARD_med[i],
+        Dr   = fr_df$DR[i],
+        clay = fr_df$CLAY[i],
+        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        solver = "euler"
+    )
+    fp <- tail(temp, 1)
+})
+Sys.time()
+# saveRDS(rothC_fr_med, file = "rothC_fr_med.rds")
+stopCluster(clus)
+
+
+# Cinput high ----
+clus <- makeCluster(10)
+clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
+
+Sys.time()
+rothC_fr_high <- parLapply(clus, 1:nrow(fr_df), function(i) {
+    
+    temp <- carbonTurnover(
+        tt   = years,
+        C0   = c(fr_df$DPM_wu.r[i], fr_df$RPM_wu.r[i], fr_df$BIO_wu.r[i], fr_df$HUM_wu.r[i], fr_df$IOM_wu.r[i]),
+        In   = fr_df$CinputFORWARD_high[i],
+        Dr   = fr_df$DR[i],
+        clay = fr_df$CLAY[i],
+        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        solver = "euler"
+    )
+    fp <- tail(temp, 1)
+})
+Sys.time()
+# saveRDS(rothC_fr_high, file = "rothC_fr_high.rds")
+stopCluster(clus)
