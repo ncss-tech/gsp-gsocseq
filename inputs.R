@@ -398,9 +398,11 @@ writeRaster(npp8100_max_TnCHaYr_avg,
 
 # Vegetation Cover ----
 vars <- paste0("NDVI_2000-2020_prop_gt_06_CR_MES_", formatC(1:12, width = 2, flag = "0"), "_conus.tif")
-veg <- stack(vars)
+veg <- readAll(stack(vars))
+veg[is.na(veg)] <- 0
 veg <- (veg * -0.4) + 1
-veg2 <- resample(readAll(veg), gsoc2, method = "bilinear", progress = "text")
+veg2 <- resample(veg, gsoc2, method = "bilinear", progress = "text")
+veg2 <- mask(veg2, gsoc2)
 # writeRaster(veg2, filename = "CONUS_Cov_stack_AOI.tif", options = c("COMPRESS=DEFLATE"), progress = "text", overwrite = TRUE)
 
 
@@ -439,7 +441,7 @@ su_rs <- readAll(stack(vars))
 
 su_pts <- rasterToPoints(su_rs, spatial = TRUE, progress = "text")
 su_pts2 <- subset(su_pts, as.character(LU) %in% c(2, 3, 5, 12, 13))
-saveRDS(su_pts2, file = "su_sdf.RDS")
+saveRDS(su_pts2, file = "su_sdf_v2.RDS")
 
 
 
@@ -484,13 +486,13 @@ test <- lapply(1:34, function(x) {
   wu_pts <- extract(rs_sub, lu_pts, xy = TRUE)
   
   # save points
-  saveRDS(wu_pts, file = paste0("wu_pts_tile_", x, ".rds"))
+  saveRDS(wu_pts, file = paste0("wu_pts_tile_", x, "_v2.rds"))
   
   return(dim(wu_pts))
 })
 
 
-f <- paste0("wu_pts_tile_", 1:34, ".rds")
+f <- paste0("wu_pts_tile_", 1:34, "_v2.rds")
 wu_pts <- lapply(f, function(x){
   temp <- readRDS(file = x)
   temp <- temp[complete.cases(temp), ]
@@ -509,7 +511,7 @@ wu_pts <- lapply(f, function(x){
   # dim(temp)
   })
 wu_pts <- do.call("rbind", wu_pts)
-# saveRDS(wu_pts, file = "wu_pts.rds")
+# saveRDS(wu_pts, file = "wu_pts_v2.rds")
 # file.remove(f)
 
 
@@ -528,7 +530,7 @@ fr_rs <- stack(vars)
 fr_rs <- readAll(fr_rs)
 fr_pts <- rasterToPoints(fr_rs, spatial = TRUE, progress = "text")
 fr_pts2 <- subset(fr_pts, as.character(LU) %in% c(2, 3, 5, 12))
-saveRDS(fr_pts2, file = "fr_sdf.RDS")
+saveRDS(fr_pts2, file = "fr_sdf_v2.RDS")
 
 
 

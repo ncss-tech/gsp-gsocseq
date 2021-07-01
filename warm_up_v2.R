@@ -474,12 +474,6 @@ rc_wu_all <- rbind(
 rc_wu_all$SOC_t0 <- rowSums(rc_wu_all[5:10])
 names(rc_wu_all)[5:10] <- c("time", "DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
 
-rc_wu_all <- reshape(rc_wu_all, direction = "wide",
-                     idvar = c("id"),
-                     timevar = "source", 
-                     v.names = names(rc_wu_all[c(3, 4, 6:11)])
-)
-rc_wu_all <- cbind(su_df[vars], rc_wu_all)
 
 
 # save final results
