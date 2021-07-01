@@ -240,6 +240,7 @@ Sys.time()
 stopCluster(clus)
 
 
+
 # Cinput bau max ----
 clus <- makeCluster(10)
 clusterExport(clus, list("fr_df", "xi_max", "years", "carbonTurnover"))
@@ -287,6 +288,7 @@ Sys.time()
 stopCluster(clus)
 
 
+
 # Cinput med ----
 clus <- makeCluster(10)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
@@ -310,6 +312,7 @@ Sys.time()
 stopCluster(clus)
 
 
+
 # Cinput high ----
 clus <- makeCluster(10)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
@@ -331,3 +334,118 @@ rothC_fr_high <- parLapply(clus, 1:nrow(fr_df), function(i) {
 Sys.time()
 # saveRDS(rothC_fr_high, file = "rothC_fr_high.rds")
 stopCluster(clus)
+
+
+
+# Cinput med min ----
+clus <- makeCluster(10)
+clusterExport(clus, list("fr_df", "xi_min", "years", "carbonTurnover"))
+
+Sys.time()
+rothC_fr_medmin <- parLapply(clus, 1:nrow(fr_df), function(i) {
+    
+    temp <- carbonTurnover(
+        tt   = years,
+        C0   = c(fr_df$DPM_wu.min[i], fr_df$RPM_wu.min[i], fr_df$BIO_wu.min[i], fr_df$HUM_wu.min[i], fr_df$IOM_wu.min[i]),
+        In   = fr_df$CinputFORWARD_med_min[i],
+        Dr   = fr_df$DR[i],
+        clay = fr_df$CLAY_min[i],
+        effcts = data.frame(years, rep(unlist(xi_min[i, 2:13]), length.out = length(years))),
+        solver = "euler"
+    )
+    fp <- tail(temp, 1)
+})
+Sys.time()
+# saveRDS(rothC_fr_medmin, file = "rothC_fr_medmin.rds")
+stopCluster(clus)
+
+
+
+# Cinput med max ----
+clus <- makeCluster(10)
+clusterExport(clus, list("fr_df", "xi_max", "years", "carbonTurnover"))
+
+Sys.time()
+rothC_fr_medmax <- parLapply(clus, 1:nrow(fr_df), function(i) {
+    
+    temp <- carbonTurnover(
+        tt   = years,
+        C0   = c(fr_df$DPM_wu.max[i], fr_df$RPM_wu.max[i], fr_df$BIO_wu.max[i], fr_df$HUM_wu.max[i], fr_df$IOM_wu.max[i]),
+        In   = fr_df$CinputFORWARD_med_max[i],
+        Dr   = fr_df$DR[i],
+        clay = fr_df$CLAY_max[i],
+        effcts = data.frame(years, rep(unlist(xi_max[i, 2:13]), length.out = length(years))),
+        solver = "euler"
+    )
+    fp <- tail(temp, 1)
+})
+Sys.time()
+# saveRDS(rothC_fr_medmax, file = "rothC_fr_medmax.rds")
+stopCluster(clus)
+
+
+
+# load rothC outputs ----
+fr_df <- readRDS("fr_df.rds")
+
+rc_fr_bau    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau.rds")))
+rc_fr_baumin <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_min.rds")))
+rc_fr_baumax <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_max.rds")))
+rc_fr_low    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_low.rds")))
+rc_fr_med    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_med.rds")))
+rc_fr_high   <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_high.rds")))
+rc_fr_medmin <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_medmin.rds")))
+rc_fr_medmax <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_medmax.rds")))
+
+
+ids <- 1:nrow(rc_fr_bau)
+rc_fr_all <- rbind(
+    cbind(source = "bau",    id = ids, rc_fr_bau),
+    cbind(source = "baumin", id = ids, rc_fr_baumin),
+    cbind(source = "baumax", id = ids, rc_fr_baumax),
+    cbind(source = "low",    id = ids, rc_fr_low),
+    cbind(source = "med",    id = ids, rc_fr_med),
+    cbind(source = "high",   id = ids, rc_fr_high),
+    cbind(source = "medmin", id = ids, rc_fr_medmin),
+    cbind(source = "medmax", id = ids, rc_fr_medmax)
+)
+rc_fr_all$f_t <- rowSums(rc_fr_all[4:8])
+names(rc_fr_all)[4:8] <- c("DPM_fr", "RPM_fr", "BIO_fr", "HUM_fr", "IOM_fr")
+
+rc_fr_all <- reshape(rc_fr_all, direction = "wide",
+                     idvar = c("id"),
+                     timevar = "source", 
+                     v.names = names(rc_fr_all[c(4:9)])
+)
+
+vars <- c("x", "y", "SOC", "CLAY", "LU", "SOC_t0.r", "SOC_t0.min", "SOC_t0.max", "CinputFORWARD.r", "CinputFORWARD.min", "CinputFORWARD.max")
+names(fr_df)[3:6] <- vars[1:4]
+
+rc_fr_all2 <- cbind(fr_df[vars], rc_fr_all)
+
+
+
+# Uncertainties
+rc_fr_all <- within(rc_fr_all, {
+    unc_soc = (f_t.baumax - f_t.baumin) / (2 * f_t.bau)  * 100
+    unc_t0  = (SOC_t0.max - SOC_t0.min) / (2 * SOC_t0.r) * 100
+    unc_ssm = (f_t.medmax - f_t.medmin) / (2 * f_t.med)  * 100
+})
+
+
+
+# Convert to points
+names(rc_fr_all) <- gsub("\\.", "_", names(rc_fr_all))
+
+rc_fr_final <- st_as_sf(
+    rc_fr_all,
+    coords = c("x", "y"),
+    crs    = 5070
+    ) %>%
+    st_transform(4326)
+
+saveRDS(rc_fr_final, file = "rothC_fr_final.rds")
+write_sf(rc_fr_final, dsn = "rothC_fr_final.gpkg", driver = "GPKG", overwrite = TRUE) 
+
+
+
