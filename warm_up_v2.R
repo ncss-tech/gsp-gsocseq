@@ -14,31 +14,31 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 
 
 # Load warm up data
-wu_df <- readRDS(file = "wu_pts.rds")
-wu_sf <- st_as_sf(
-  wu_df,
-  coords = c("x", "y"),
-  crs    = 4326
-  ) %>%
-  st_transform(crs = 5070)
-wu_df    <- cbind(round(st_coordinates(wu_sf)), st_drop_geometry(wu_sf))
-wu_df    <- wu_df[complete.cases(wu_df), ]
-wu_df$xy <- paste(wu_df$X, wu_df$Y, sep = "_")
-rm(wu_sf)
-
-idx <- 1:nrow(wu_df)
+wu_df <- data.table::fread(file = "wu_pts_v2.csv")
+# wu_sf <- st_as_sf(
+#   wu_df,
+#   coords = c("x", "y"),
+#   crs    = 4326
+#   ) %>%
+#   st_transform(crs = 5070)
+# wu_df    <- cbind(round(st_coordinates(wu_sf)), st_drop_geometry(wu_sf))
+# wu_df    <- wu_df[complete.cases(wu_df), ]
+# wu_df$xy <- paste(wu_df$X, wu_df$Y, sep = "_")
+# rm(wu_sf)
+# 
+# idx <- 1:nrow(wu_df)
 # idx <- as.integer(cut(idx, breaks = quantile(idx, probs = seq(0, 1, 0.2)), include.lowest = TRUE))
 # wu_df <- wu_df[idx == 2, ]
 
 
 # Load spin up results
-# su_df <- readRDS(file = "conus_su_results_v2.rds")
+su_df <- readRDS(file = "conus_su_results_v3_analytical.rds")
 # su_df <- st_transform(su_df, crs = 5070)
 # su_df <- cbind(round(st_coordinates(su_df)), st_drop_geometry(su_df))
 # su_df$xy <- paste(su_df$X, su_df$Y, sep = "_")
 # saveRDS(su_df, "conus_su_results_v3.rds")
-su_df <- readRDS("conus_su_results_v3.rds")
-su_vars <- names(su_df)
+# su_df <- readRDS("conus_su_results_v3.rds")
+# su_vars <- names(su_df)
 
 
 # combine
@@ -49,8 +49,9 @@ su_vars <- names(su_df)
 # su_df <- wu_df[vars]
 # saveRDS(su_df, "su_df.rds")
 # rm(su_df)
-
-wu_df <- readRDS("wu_df.rds")
+# wu_df <- readRDS("wu_df.rds")
+wu_df <- cbind(su_df, wu_df)
+rm(su_df)
 
 
 # Extract variables
@@ -122,10 +123,13 @@ NPP_M_min <- sapply(1:19, function(i) npp_coef(LU, NPP_M_min[, i]))
 NPP_M_max <- sapply(1:19, function(i) npp_coef(LU, NPP_M_max[, i]))
 
 
-C_rv  <- cbind(replicate(19, wu_df$Ceq.r))
-C_min <- cbind(replicate(19, wu_df$Ceq.min))
-C_max <- cbind(replicate(19, wu_df$Ceq.max))
+C_rv  <- cbind(replicate(19, wu_df$Cin.r))
+C_min <- cbind(replicate(19, wu_df$Cin.min))
+C_max <- cbind(replicate(19, wu_df$Cin.max))
 
+# C_rv  <- apply(C_rv,  2, function(x) ifelse(is.na(x), 0, x))
+# C_min <- apply(C_min, 2, function(x) ifelse(is.na(x), 0, x))
+# C_max <- apply(C_max, 2, function(x) ifelse(is.na(x), 0, x))
 
 C_rv[, 1]  <- C_rv[, 1]  / NPP_M[, 1]     * NPP_M[, 1]
 C_min[, 1] <- C_min[, 1] / NPP_M_min[, 1] * NPP_M_min[, 1]
@@ -152,122 +156,104 @@ saveRDS(C_max, "wu_C_max.rds")
 rm(wu_df)
 rm(PREC, PREC_sum, PREC_sum_min, PREC_sum_max)
 rm(TEMP, TEMP_avg, TEMP_avg_min, TEMP_avg_max)
-rm(NPP_M, NPP_M_min, NPP_M_max)
+rm(NPP_M, NPP_M_min, NPP_M_max, NPP_rv, NPP_min, NPP_max)
 rm(C_rv, C_min, C_max)
 
 
 
 # Moisture effects per month ----
-fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
+xi <- lapply(1:10, function(x) {
   
-  M     <- PREC - PET * pE
+  fn <- paste0("wu_pts_sub_", x, "_v2.rds")
   
-  n    <- ncol(M)  / 12
-  idx  <- rep(1:12, n)
-  bare  <- as.data.frame(lapply(COV[, idx], function(x) x > 0.8))
+  cat("computing ", fn , as.character(Sys.time()), "\n")
   
-  B <- as.data.frame(lapply(bare, function(x) ifelse(x == FALSE, 1, 1.8)))
-  Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23)
-  Max.TSMD <- as.data.frame(lapply(1 / B, function(x) x * Max.TSMD))
-  rm(B, bare)
+  wu_df <- readRDS(file = fn)
+  pClay_r <- wu_df$CONUS_gnatsgo_fy20_1km_clay_wt
+  TEMP <- wu_df[grepl("_tmmx$", names(wu_df))]
+  PREC <- wu_df[grepl("_pr$", names(wu_df))]
+  PET  <- wu_df[grepl("_pet$",  names(wu_df))]
+  COV  <- wu_df[grepl("^CON_",  names(wu_df))]
+  LU   <- wu_df$CONUS_glc_shv10_DOM
   
-  Acc.TSMD <- M
-  Acc.TSMD[, 1] <- ifelse(M[, 1] > 0, 0, M[, 1])
   
-  for (i in 2:ncol(M)) {
-    Acc.TSMD_i <- Acc.TSMD[, i - 1] + M[, i]
-    Acc.TSMD[, i] <- ifelse(
-      Acc.TSMD_i < 0,
-      Acc.TSMD_i,
-      0
-    )
-    Acc.TSMD[, i] <- ifelse(
-      Acc.TSMD[, i] <= Max.TSMD[, i],
-      Max.TSMD[, i],
-      Acc.TSMD[, i]
-    )
+  fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
+  fW_min <- fW(pClay_r * 0.9, PREC * 0.95, PET, COV, s_thk = 30, pE = 1)
+  fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
+  
+  
+  # Temperature effects per month ----
+  fT_r   <- as.data.frame(lapply(TEMP,        function(x) {
+    temp <- fT.RothC(x)
+    temp <- ifelse(is.na(temp), 0, temp)
+  }))
+  fT_min <- as.data.frame(lapply(TEMP * 1.02, function(x) {
+    temp <- fT.RothC(x)
+    temp <- ifelse(is.na(temp), 0, temp)
+  }))
+  fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) {
+    temp <- fT.RothC(x)
+    temp <- ifelse(is.na(temp), 0, temp)
+  }))
+  
+  
+  # Vegetation Cover effects ----
+  fC <- COV[, rep(1:12, length.out = ncol(PREC))]
+  
+  
+  # Paddy fields coefficent  ----
+  # fPR = 0.4 if the target point is class = 13 , else fPR=1
+  # From Shirato and Yukozawa 2004
+  fPR <- (LU == 13) * 0.4 + (LU != 13) * 1
+  
+  
+  # Set the factors frame for Model calculations ----
+  xi_r   <- fT_r
+  xi_min <- fT_min
+  xi_max <- fT_max
+  
+  for (i in 1:ncol(fT_r)) {
+    xi_r[, i]   <- fT_r[, i]  * fW_r[, i]    * fC[, i] * fPR
+  }
+  for (i in 1:ncol(fT_min)) {
+    xi_min[, i] <- fT_min[, i] * fW_min[, i] * fC[, i] * fPR
+  }
+  for (i in 1:ncol(fT_max)) {
+    xi_max[, i] <- fT_max[, i] * fW_max[, i] * fC[, i] * fPR
   }
   
-  fW <- Acc.TSMD
   
-  for (i in 1:ncol(fW)) {
-    fW[, i] <- ifelse(
-      Acc.TSMD[, i] > 0.444 * Max.TSMD[, i], 
-      1, 
-      (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i]) / (Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
-    )
-    fW[, i] <- raster::clamp(fW[, i], lower = 0.2)
-  }
+  saveRDS(xi_r,   paste0("wu_effcts_r_sub_",   x, ".rds"))
+  saveRDS(xi_min, paste0("wu_effcts_min_sub_", x, ".rds"))
+  saveRDS(xi_max, paste0("wu_effcts_max_sub_", x, ".rds"))
   
-  return(fW)
-}
+})
 
 
-wu_df <- readRDS("wu_df.rds")
-pClay_r   <- wu_df$CONUS_gnatsgo_fy20_1km_clay_wt
-TEMP <- wu_df[grepl("_tmmx$", names(wu_df))]
-PREC <- wu_df[grepl("_pr$", names(wu_df))]
-PET  <- wu_df[grepl("_pet$",  names(wu_df))]
-COV  <- wu_df[grepl("^CON_",  names(wu_df))]
-LU   <- wu_df$CONUS_glc_shv10_DOM
-rm(wu_df)
+xi_r <- do.call(
+  "rbind", 
+  lapply(1:10, function(x){
+    temp <- readRDS(paste0("wu_effcts_r_sub_", x, ".rds"))
+  })
+)
 
+xi_min <- do.call(
+  "rbind", 
+  lapply(1:10, function(x){
+    temp <- readRDS(paste0("wu_effcts_min_sub_", x, ".rds"))
+  })
+)
 
-fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
-fW_min <- fW(pClay_r * 0.9, PREC * 0.95, PET, COV, s_thk = 30, pE = 1)
-fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
+xi_max <- do.call(
+  "rbind", 
+  lapply(1:10, function(x){
+    temp <- readRDS(paste0("wu_effcts_max_sub_", x, ".rds"))
+  })
+)
 
-
-# Temperature effects per month ----
-fT_r   <- as.data.frame(lapply(TEMP,        function(x) {
-  temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
-  }))
-fT_min <- as.data.frame(lapply(TEMP * 1.02, function(x) {
-  temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
-  }))
-fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) {
-  temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
-  }))
-
-
-# Vegetation Cover effects ----
-fC <- COV[, rep(1:12, length.out = ncol(PREC))]
-
-
-# Paddy fields coefficent  ----
-# fPR = 0.4 if the target point is class = 13 , else fPR=1
-# From Shirato and Yukozawa 2004
-fPR <- (LU == 13) * 0.4 + (LU != 13) * 1
-
-
-# Set the factors frame for Model calculations ----
-xi_r   <- fT_r
-xi_min <- fT_min
-xi_max <- fT_max
-
-for (i in 1:ncol(fT_r)) {
-  xi_r[, i]   <- fT_r[, i]  * fW_r[, i]    * fC[, i] * fPR
-}
-for (i in 1:ncol(fT_min)) {
-  xi_min[, i] <- fT_min[, i] * fW_min[, i] * fC[, i] * fPR
-}
-for (i in 1:ncol(fT_max)) {
-  xi_max[, i] <- fT_max[, i] * fW_max[, i] * fC[, i] * fPR
-}
-
-
-xi_r   <- cbind(id = 1:nrow(xi_r),   xi_r)
-xi_min <- cbind(id = 1:nrow(xi_min), xi_min)
-xi_max <- cbind(id = 1:nrow(xi_max), xi_max)
-
-
-saveRDS(xi_r,   "wu_effcts_r.rds");   rm(xi_r,   fW_r,   fT_r,   fC, fPR)
-saveRDS(xi_min, "wu_effcts_min.rds"); rm(xi_min, fW_min, fT_min, fC, fPR)
-saveRDS(xi_max, "wu_effcts_max.rds"); rm(xi_max, fW_max, fT_max, fC, fPR)
-
+data.table::fwrite(xi_r,   "wu_effcts_r.csv")
+data.table::fwrite(xi_min, "wu_effcts_min.csv")
+data.table::fwrite(xi_max, "wu_effcts_max.csv")
 
 
 # RUN THE MODEL from soilassessment ----
@@ -276,15 +262,15 @@ saveRDS(xi_max, "wu_effcts_max.rds"); rm(xi_max, fW_max, fT_max, fC, fPR)
 nSim  <- raster::nlayers(raster::stack("CONUS_Temp_Stack_228_01_19_TC.tif")) / 12
 years <- seq(1 / 12, 1, by = 1 / 12)
 
-su_df <- readRDS("su_df.rds")
+su_df <- as.data.frame(readRDS("conus_su_results_v3_analytical.rds"))
 
 pClay_r   <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt
 pClay_min <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt * 0.9
 pClay_max <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt * 1.1
 
-xi_r   <- readRDS("wu_effcts_r.rds")
-xi_min <- readRDS("wu_effcts_min.rds")
-xi_max <- readRDS("wu_effcts_max.rds")
+xi_r   <- as.data.frame(data.table::fread("wu_effcts_r.csv"))
+xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv"))
+xi_max <- as.data.frame(data.table::fread("wu_effcts_max.csv"))
 
 C_rv  <- readRDS("wu_C_rv.rds")
 C_min <- readRDS("wu_C_min.rds")
@@ -294,20 +280,20 @@ C_max <- readRDS("wu_C_max.rds")
 library(parallel)
 
 # C input equilibrium. (Ceq) ----
-#su_df <- su_df[1:200, ]; C_rv <- C_rv[1:200, ]; xi_r <- xi_r[1:200, ]
+# su_df2 <- su_df[1:2000, ]; C_rv2 <- C_rv[1:2000, ]; xi_r2 <- xi_r[1:2000, ]
 
-clus <- makeCluster(7)
+clus <- makeCluster(4)
 clusterExport(clus, list("su_df", "C_rv", "xi_r", "years", "carbonTurnover", "rothC_wu"))
 
 Sys.time()
 rothC_r <- rothC_wu(
   time = years,
-  su_df = su_df, pClay_var = "pClay.r", C0_vars = c("DPM_p.r", "RPM_p.r", "BIO_p.r", "HUM_p.r", "FallIOM.r"), DR_var = "CONUS_glc_shv10_DOM_DR", 
-  C_m = C_rv,
+  su_df = su_df, pClay_var = "pClay.r", C0_vars = c("fract.dpm.r", "fract.rpm.r", "fract.bio.r", "fract.hum.r", "fract.iom.r"), DR_var = "DR", 
+  C_m   = C_rv,
   xi_df = xi_r
 )
 Sys.time()
-# saveRDS(rothC_r, file = "rothC_r_wu.rds")
+# saveRDS(rothC_r, file = "rothC_r_wu_v2.rds")
 stopCluster(clus)
 
 

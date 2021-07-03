@@ -440,12 +440,19 @@ su_rs <- readAll(stack(vars))
 # writeRaster(su_rs, filename = "Stack_Set_SPIN_UP_AOI.tif", format = "GTiff", progress = "text", overwrite = TRUE)
 
 su_pts <- rasterToPoints(su_rs, spatial = TRUE, progress = "text")
-su_pts2 <- subset(su_pts, as.character(LU) %in% c(2, 3, 5, 12, 13))
+su_df  <- as.data.frame(su_pts)
+su_pts2 <- su_pts[
+  as.character(su_df$LU) %in% c(2, 3, 5, 12, 13) 
+  & complete.cases(su_df), 
+  ]
 saveRDS(su_pts2, file = "su_sdf_v2.RDS")
 
+write_sf(st_as_sf(su_pts2), dsn = "test.gpkg", driver = "GPKG")
 
 
 # Warm up layers
+su_pts <- readRDS(file = "su_sdf_v2.RDS")
+
 n_wu <- 18
 
 vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
@@ -461,58 +468,87 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           NPP_MAX = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"
 )
 # LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
-wu_rs <- rast(vars)
+# wu_rs  <- rast(vars)
+wu_rs  <- stack(vars)
 
-tiles <- st_as_sf(st_make_grid(aoi, n = c(6, 6)))
-tiles$tile <- 1:nrow(tiles)
+su_pts$idx <- as.integer(
+  cut(su_pts$id, 
+      breaks = quantile(su_pts$id, p = seq(0, 1, 0.1)), 
+      include.lowest = TRUE)
+)
 
-
-# iterate over tiles and extract points
-test <- lapply(1:34, function(x) {
-  
-  cat("cropping ", x, as.character(Sys.time()), "\n")
-  
-  # crop raster stack
-  tiles_sub <- vect(tiles[tiles$tile == x, ])
-  # tiles_sub <- as(tiles[tiles$tile == x, ], "Spatial")
-  rs_sub    <- crop(wu_rs, tiles_sub)
-  
-  # mask non-ag landuses
-  LU <- c(2, 3, 5, 12)
-  rs_sub$CONUS_glc_shv10_DOM[! rs_sub$CONUS_glc_shv10_DOM %in% LU] <- NA
-  
-  # extract points
-  lu_pts <- as.points(rs_sub$CONUS_glc_shv10_DOM)
-  wu_pts <- extract(rs_sub, lu_pts, xy = TRUE)
-  
-  # save points
-  saveRDS(wu_pts, file = paste0("wu_pts_tile_", x, "_v2.rds"))
-  
-  return(dim(wu_pts))
+test <- lapply(1, function(x) {
+  cat("extracting part", x, as.character(Sys.time()), "\n")
+  # temp  <- vect(su_pts[which(su_pts$idx == x), ])
+  temp  <- su_pts[which(su_pts$idx == x), ]
+  # wu_ex <- extract(wu_rs, temp, xy = TRUE)
+  wu_ex <- as.data.frame(extract(wu_rs, temp, sp = TRUE, ))
+  wu_ex <- cbind(idx = x, wu_ex)
+  saveRDS(wu_ex, file = paste0("wu_pts_sub_", x, "_v2.rds"))
 })
 
+f_p <- paste0("wu_pts_sub_", 1:10, "_v2.rds")
 
-f <- paste0("wu_pts_tile_", 1:34, "_v2.rds")
-wu_pts <- lapply(f, function(x){
+wu_pts_p1 <- lapply(f_p[1:5], function(x){
   temp <- readRDS(file = x)
-  temp <- temp[complete.cases(temp), ]
-  # nm     <- names(temp)
-  # idx    <- which(!grepl("_tmmx$|_pr$|_pet$", nm))
-  # id_tmp <- which(grepl("_tmmx$", nm))[1]
-  # id_ppt <- which(grepl("_pr$", nm))[1]
-  # id_pet <- which(grepl("_pet$", nm))[1]
-  # 
-  # temp <- temp[c(
-  #   idx, 
-  #   id_tmp:(id_tmp + 11),
-  #   id_ppt:(id_ppt + 11),
-  #   id_pet:(id_pet + 11)
-  # )]
-  # dim(temp)
   })
-wu_pts <- do.call("rbind", wu_pts)
-# saveRDS(wu_pts, file = "wu_pts_v2.rds")
-# file.remove(f)
+wu_pts_p1 <- data.table::rbindlist(wu_pts_p1)
+data.table::fwrite(wu_pts_p1, file = "wu_pts_p1.csv")
+
+wu_pts_p2 <- lapply(f_p[6:10], function(x) {
+  temp <- readRDS(file = x)
+})
+wu_pts_p2 <- data.table::rbindlist(wu_pts_p2)
+data.table::fwrite(wu_pts_p2, file = "wu_pts_p2.csv")
+
+wu_pts_p1 <- data.table::fread(file = "wu_pts_p1.csv")
+wu_pts_p2 <- data.table::fread(file = "wu_pts_p2.csv")
+wu_pts <- rbind(wu_pts_p1, wu_pts_p2)
+data.table::fwrite(wu_pts, file = "wu_pts_v2.csv")
+
+
+# tiles <- st_as_sf(st_make_grid(aoi, n = c(6, 6)))
+# tiles$tile <- 1:nrow(tiles)
+# 
+# # iterate over tiles and extract points
+# test <- lapply(1:34, function(x) {
+#   
+#   cat("cropping ", x, as.character(Sys.time()), "\n")
+#   
+#   # crop raster stack
+#   tiles_sub <- vect(tiles[tiles$tile == x, ])
+#   # tiles_sub <- as(tiles[tiles$tile == x, ], "Spatial")
+#   rs_sub    <- crop(wu_rs, tiles_sub)
+#   
+#   # mask non-ag landuses
+#   LU <- c(2, 3, 5, 12)
+#   rs_sub$CONUS_glc_shv10_DOM[! rs_sub$CONUS_glc_shv10_DOM %in% LU] <- NA
+#   
+#   # extract points
+#   lu_pts <- as.points(rs_sub$CONUS_glc_shv10_DOM)
+#   wu_pts <- extract(rs_sub, lu_pts, xy = TRUE)
+#   
+#   # save points
+#   saveRDS(wu_pts, file = paste0("wu_pts_tile_", x, "_v2.rds"))
+#   
+#   return(dim(wu_pts))
+# })
+# 
+# 
+# f_p1 <- paste0("wu_pts_tile_", 1:21, "_v2.rds")
+# f_p2 <- paste0("wu_pts_tile_", 22:34, "_v2.rds")
+# 
+# wu_pts_p1 <- lapply(f_p1, function(x){
+#   temp <- readRDS(file = x)
+#   temp <- temp[complete.cases(temp), ]
+#   })
+# # saveRDS(do.call("rbind", wu_pts_p1), file = "wu_pts_v2_part1.rds")
+# wu_pts_p2 <- lapply(f_p2, function(x){
+#   temp <- readRDS(file = x)
+#   temp <- temp[complete.cases(temp), ]
+# })
+# # saveRDS(do.call("rbind", wu_pts_p2), file = "wu_pts_v2_part2.rds")
+# # file.remove(f)
 
 
 # Forward Run
@@ -528,9 +564,8 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
 fr_rs <- stack(vars)
 # writeRaster(fr_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
 fr_rs <- readAll(fr_rs)
-fr_pts <- rasterToPoints(fr_rs, spatial = TRUE, progress = "text")
-fr_pts2 <- subset(fr_pts, as.character(LU) %in% c(2, 3, 5, 12))
-saveRDS(fr_pts2, file = "fr_sdf_v2.RDS")
+fr_pts <- extract(fr_rs, su_pts, sp = TRUE, progress = "text")
+saveRDS(fr_pts, file = "fr_sdf_v2.RDS")
 
 
 

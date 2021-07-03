@@ -23,10 +23,8 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 
 
 # Stack_Set_1 is a stack that contains the spatial variables 
-su_sdf <- readRDS(file = "su_sdf.RDS")
+su_sdf <- readRDS(file = "su_sdf_v2.RDS")
 su_df  <- as.data.frame(su_sdf)
-su_df  <- su_df[complete.cases(su_df), ]
-su_df  <- cbind(ID = 1:nrow(su_df), su_df)
 
 
 # Extract the layers from the Vector
@@ -44,10 +42,6 @@ TEMP <- su_df[grepl("^TEMP_", names(su_df))]
 PREC <- su_df[grepl("^PREC_", names(su_df))]
 PET  <- su_df[grepl("^PET_",  names(su_df))]
 COV  <- su_df[grepl("^COV_",  names(su_df))]
-
-
-# Define Years for Cinputs calculations ----
-years <- seq(1 / 12, 500, by = 1 / 12)
 
 
 # Paddy fields coefficent  ----
@@ -136,13 +130,9 @@ for (i in 1:ncol(fT_max)) {
   xi_max[, i] <- fT_max[, i] * fW_max[, i] * fC[, i] * fPR
 }
 
-ri_r   <- cbind(id = 1:nrow(xi_r),   xi_r); 
-ri_min <- cbind(id = 1:nrow(xi_min), xi_min)
-ri_max <- cbind(id = 1:nrow(xi_max), xi_max)
-
-saveRDS(ri_r,   "su_effcts_r.rds");   rm(su_sdf, TEMP, PREC, PET, xi_r, fT_r, fW_r, fC, fPR, COV)
-saveRDS(ri_min, "su_effcts_min.rds"); rm(su_sdf, TEMP, PREC, PET, xi_min, fT_min, fW_min, fC, fPR, COV)
-saveRDS(ri_max, "su_effcts_max.rds"); rm(su_sdf, TEMP, PREC, PET, xi_max, fT_max, fW_max, fC, fPR, COV)
+saveRDS(xi_r,   "su_effcts_r.rds");   rm(su_sdf, TEMP, PREC, PET, COV, fC, fPR, xi_r, fT_r, fW_r)
+saveRDS(xi_min, "su_effcts_min.rds"); rm(su_sdf, xi_min, fT_min, fW_min)
+saveRDS(xi_max, "su_effcts_max.rds"); rm(xi_max, fT_max, fW_max, fC, fPR)
 
 
 # # Roth C outputs
@@ -169,6 +159,9 @@ saveRDS(ri_max, "su_effcts_max.rds"); rm(su_sdf, TEMP, PREC, PET, xi_max, fT_max
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
+su_df <- as.data.frame(readRDS(file = "su_sdf_v2.RDS"))
+
+years <- seq(1 / 12, 500, by = 1 / 12)
 
 Cinputs <- 1
 DR      <- su_df$DR
@@ -185,8 +178,19 @@ FallIOM_r   <- 0.049 * SOC_r^(1.139)
 FallIOM_min <- 0.049 * SOC_min^(1.139)
 FallIOM_max <- 0.049 * SOC_max^(1.139)
 
+fractI <- cbind(
+  DPM = DR / (DR + 1), 
+  RPM = 1 - DR / (DR + 1), 
+  HUM = 0
+  )
 
-ri_min <- readRDS("su_effcts_min.rds")
+xi_r   <- readRDS("su_effcts_r.rds")
+xi_min <- readRDS("su_effcts_min.rds")
+xi_max <- readRDS("su_effcts_max.rds")
+
+xi_r2   <- rowMeans(xi_r)
+xi_min2 <- rowMeans(xi_min)
+xi_max2 <- rowMeans(xi_max)
 
 
 library(parallel)
@@ -194,172 +198,241 @@ library(parallel)
 clus <- makeCluster(15)
 
 # C input equilibrium. (Ceq) ----
-clusterExport(clus, list("su_df", "DR", "pClay_r", "ri_r", "FallIOM_r", "years", "carbonTurnover")) # , "rothC"))
+# clusterExport(clus, list("DR", "pClay_r", "ri_r", "FallIOM_r", "years", "carbonTurnover")) # , "rothC"))
+# 
+# Sys.time()
+# rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
+#   
+#   temp <- carbonTurnover(
+#     tt   = years,
+#     C0   = c(0, 0, 0, 0, FallIOM_r[i]),
+#     In   = 1,
+#     Dr   = DR[i],
+#     clay = pClay_r[i],
+#     effcts = data.frame(years, rep(unlist(ri_r[i, 1:12]), length.out = length(years))),
+#     solver = "euler"
+#   )
+#   temp <- tail(temp, 1)
+#   
+#   return(temp)
+# })
+# Sys.time()
+# # saveRDS(rothC_r, file = "rothC_r_v3.rds")
+# stopCluster(clus)
+
+clus <- makeCluster(15)
+clusterExport(clus, list("SOC_r", "pClay_r", "xi_r2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
 rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
   
-  temp <- carbonTurnover(
-    tt   = years,
-    C0   = c(0, 0, 0, 0, FallIOM_r[i]),
-    In   = 1,
-    Dr   = DR[i],
-    clay = pClay_r[i],
-    effcts = data.frame(years, rep(unlist(ri_r[i, 2:13]), length.out = length(years))),
-    solver = "euler"
+  temp <- fget_equilibrium_fractions.RothC_input(
+    xi     = xi_r2[i], 
+    C.tot  = SOC_r[i], 
+    clay   = pClay_r[i], 
+    fractI = fractI[i, ]
   )
-  temp <- tail(temp, 1)
   
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_r, file = "rothC_r_v2.rds")
+# saveRDS(rothC_r, file = "rothC_r_v3_analytical.rds")
 stopCluster(clus)
 
 
-# UNCERTAINTIES C input equilibrium (MINIMUM)
-# C input equilibrium. (Ceq) ----
-clusterExport(clus, list("su_df", "DR", "pClay_min", "ri_min", "FallIOM_min", "years", "carbonTurnover")) # , "rothC"))
+
+# # UNCERTAINTIES C input equilibrium (MINIMUM)
+# # C input equilibrium. (Ceq) ----
+# clusterExport(clus, list("DR", "pClay_min", "ri_min", "FallIOM_min", "years", "carbonTurnover")) # , "rothC"))
+# 
+# Sys.time()
+# rothC_min <- parLapply(clus, 1:nrow(su_df), function(i) {
+#   
+#   temp <- carbonTurnover(
+#     tt   = years,
+#     C0   = c(0, 0, 0, 0, FallIOM_min[i]),
+#     In   = 1,
+#     Dr   = DR[i],
+#     clay = pClay_min[i],
+#     effcts = data.frame(years, rep(unlist(ri_min[i, 1:12]), length.out = length(years))),
+#     solver = "euler"
+#   )
+#   temp <- tail(temp, 1)
+#   
+#   return(temp)
+# })
+# Sys.time()
+# # saveRDS(rothC_min, file = "rothC_min_v2.rds")
+# stopCluster(clus)
+
+
+clus <- makeCluster(15)
+clusterExport(clus, list("SOC_min", "pClay_min", "xi_min2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
 rothC_min <- parLapply(clus, 1:nrow(su_df), function(i) {
   
-  temp <- carbonTurnover(
-    tt   = years,
-    C0   = c(0, 0, 0, 0, FallIOM_min[i]),
-    In   = 1,
-    Dr   = DR[i],
-    clay = pClay_min[i],
-    effcts = data.frame(years, rep(unlist(ri_min[i, 2:13]), length.out = length(years))),
-    solver = "euler"
+  temp <- fget_equilibrium_fractions.RothC_input(
+    xi     = xi_min2[i], 
+    C.tot  = SOC_min[i], 
+    clay   = pClay_min[i], 
+    fractI = fractI[i, ]
   )
-  temp <- tail(temp, 1)
   
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_min, file = "rothC_min_v2.rds")
+# saveRDS(rothC_min, file = "rothC_min_v3_analytical.rds")
 stopCluster(clus)
 
 
 # UNCERTAINTIES C input equilibrium (MAXIMUM)
-clusterExport(clus, list("su_df", "DR", "pClay_max", "ri_max", "FallIOM_max", "years", "carbonTurnover"))
+# clusterExport(clus, list("su_df", "DR", "pClay_max", "ri_max", "FallIOM_max", "years", "carbonTurnover"))
+# 
+# Sys.time()
+# rothC_max <- parLapply(clus, 1:nrow(su_df), function(i) {
+#   
+#   temp <- carbonTurnover(
+#     tt   = years,
+#     C0   = c(0, 0, 0, 0, FallIOM_max[i]),
+#     In   = 1,
+#     Dr   = DR[i],
+#     clay = pClay_max[i],
+#     effcts = data.frame(years, rep(unlist(ri_max[i, 1:12]), length.out = length(years))),
+#     solver = "euler"
+#   )
+#   temp <- tail(temp, 1)
+#   
+#   return(temp)
+# })
+# Sys.time()
+# # saveRDS(rothC_max, file = "rothC_max_v2.rds")
+# stopCluster(clus)
+
+
+clus <- makeCluster(15)
+clusterExport(clus, list("SOC_max", "pClay_max", "xi_max2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
 rothC_max <- parLapply(clus, 1:nrow(su_df), function(i) {
   
-  temp <- carbonTurnover(
-    tt   = years,
-    C0   = c(0, 0, 0, 0, FallIOM_max[i]),
-    In   = 1,
-    Dr   = DR[i],
-    clay = pClay_max[i],
-    effcts = data.frame(years, rep(unlist(ri_max[i, 2:13]), length.out = length(years))),
-    solver = "euler"
+  temp <- fget_equilibrium_fractions.RothC_input(
+    xi     = xi_max2[i], 
+    C.tot  = SOC_max[i], 
+    clay   = pClay_max[i], 
+    fractI = fractI[i, ]
   )
-  temp <- tail(temp, 1)
   
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_max, file = "rothC_max_v2.rds")
+# saveRDS(rothC_max, file = "rothC_max_v3_analytical.rds")
 stopCluster(clus)
 
 
 
-
 rothC_r <- as.data.frame(
-  cbind(su_df[c("ID", "x", "y")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r, LU,
+  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r,
         source = "r",
   do.call(
     "rbind", 
-    readRDS("rothC_r_v2.rds")
+    readRDS("rothC_r_v3_analytical.rds")
     )))
 
 rothC_min <- as.data.frame(
-  cbind(su_df[c("ID", "x", "y")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, LU, 
+  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, 
         source = "min",
   do.call(
     "rbind", 
-    readRDS("rothC_min_v2.rds")
+    readRDS("rothC_min_v3_analytical.rds")
   )))
 
 rothC_max <- as.data.frame(
-  cbind(su_df[c("ID", "x", "y")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, LU, 
+  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, 
         source = "max",
   do.call(
     "rbind", 
-    readRDS("rothC_max_v2.rds")
+    readRDS("rothC_max_v3_analytical.rds")
   )))
-
 
 rothC_df <- rbind(rothC_r, rothC_min, rothC_max)
 
+rothC_df$fract.sum <- rowSums(rothC_df[grepl("^fract", names(rothC_df))])
 
-rothC_df <- within(rothC_df, {
-  fb_t = C1 + C2 + C3 + C4 + C5
-  m    = (fb_t - FallIOM) / 1
-  Ceq  = (SOC  - FallIOM) / m
-})
-
-
-# crops, tree crops, and rice
-idx <- ifelse(rothC_r$LU %in% c(2, 12, 13), TRUE, FALSE)
-rothC_crops <- within(rothC_df[idx, ], {
-  RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 0.9902 +
-    0.4788
-  BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 1.09038 +
-    0.04055
-  HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.9878 -
-    0.3818
-  DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
-  feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
-})
-
-
-# trees
-idx <- ifelse(rothC_r$LU == 4, TRUE, FALSE)
-rothC_trees <- within(rothC_df[idx, ], {
-  RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 1.7631 + 0.4043
-  BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 0.9757 + 0.0209
-  HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.8712 - 0.2904
-  DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
-  feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
-})
-
-
-# grass and shrubs
-idx <- ifelse(rothC_df$LU %in% c(3, 5, 6, 8), TRUE, FALSE)
-rothC_grasses <- within(rothC_df[idx, ], {
-  RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 1.3837 + 0.4692
-  BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 1.03401 + 0.02531
-  HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.9316 - 0.5243
-  DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
-  feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
-})
-
-
-# combine
-rothC_df <- rbind(rothC_crops, rothC_trees, rothC_grasses)
-rothC_df[c("time", "m")] <- NULL
+# rothC_df <- within(rothC_df, {
+#   fb_t = C1 + C2 + C3 + C4 + C5
+#   m    = (fb_t - FallIOM) / 1
+#   Ceq  = (SOC  - FallIOM) / m
+# })
+# 
+# 
+# # crops, tree crops, and rice
+# idx <- ifelse(rothC_r$LU %in% c(2, 12, 13), TRUE, FALSE)
+# rothC_crops <- within(rothC_df[idx, ], {
+#   RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 0.9902 +
+#     0.4788
+#   BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 1.09038 +
+#     0.04055
+#   HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.9878 -
+#     0.3818
+#   DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
+#   feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
+# })
+# 
+# 
+# # trees
+# idx <- ifelse(rothC_r$LU == 4, TRUE, FALSE)
+# rothC_trees <- within(rothC_df[idx, ], {
+#   RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 1.7631 + 0.4043
+#   BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 0.9757 + 0.0209
+#   HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.8712 - 0.2904
+#   DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
+#   feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
+# })
+# 
+# 
+# # grass and shrubs
+# idx <- ifelse(rothC_df$LU %in% c(3, 5, 6, 8), TRUE, FALSE)
+# rothC_grasses <- within(rothC_df[idx, ], {
+#   RPM_p = ((0.184  * SOC + 0.1555) * (pClay + 1.275) ^ (-0.1158)) * 1.3837 + 0.4692
+#   BIO_p = ((0.014  * SOC + 0.0075) * (pClay + 8.8473) ^ (0.0567)) * 1.03401 + 0.02531
+#   HUM_p = ((0.7148 * SOC + 0.5069) * (pClay + 0.3421) ^ (0.0184)) * 0.9316 - 0.5243
+#   DPM_p = SOC - FallIOM - RPM_p - HUM_p - BIO_p
+#   feq_t = RPM_p + BIO_p + HUM_p + DPM_p + FallIOM
+# })
+# 
+# 
+# # combine
+# rothC_df <- rbind(rothC_crops, rothC_trees, rothC_grasses)
+# rothC_df[c("time", "m")] <- NULL
 
 
 # reshape
-nm   <- names(rothC_df)
-vars <- c("ID", "x", "y", "source", "LU")
-vars2 <- nm[! nm %in% vars]
+# nm   <- names(rothC_df)
+# vars <- c("id", "x", "y", "source", "LU")
+# vars2 <- nm[! nm %in% vars]
+# 
+# system.time(rothC_dfw <- reshape(rothC_df, direction = "wide",
+#                      idvar = c("id"),
+#                      timevar = "source", 
+#                      v.names = vars2
+#                      ))
 
-rothC_dfw <- reshape(rothC_df, direction = "wide",
-                     idvar = c("ID"),
-                     timevar = "source", 
-                     v.names = vars2
-                     )
+library(data.table)
+
+rothC_dfw2 <- dcast(
+  as.data.table(rothC_df), 
+  id + x + y + LU + DR ~ source, 
+  value.var = c("SOC", "FallIOM", "pClay", "fract.dpm", "fract.rpm", "fract.bio", "fract.hum", "fract.iom", "Cin", "fract.sum"),
+  sep = "."
+  )
  
-# convert to sf
-rothC_sf <- st_as_sf(
-  rothC_dfw,
-  coords = c("x", "y"),
-  crs = 4326
-)
+# # convert to sf
+# rothC_sf <- st_as_sf(
+#   rothC_dfw,
+#   coords = c("x", "y"),
+#   crs = 4326
+# )
 
-saveRDS(rothC_sf, file = "conus_su_results_v2.rds")
+saveRDS(rothC_dfw2, file = "conus_su_results_v3_analytical.rds")
+
