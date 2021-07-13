@@ -16,6 +16,13 @@ mu_us$source <- "gnatsgo"
 load(file = "D:/geodata/project_data/gsp-bs/data/gnatsgo.RData")
 
 
+f_ak  <- fetchGDB(dsn ="D:/geodata/soils/gNATSGO_AK_july2020.gdb", WHERE = "areasymbol LIKE '%'")
+mu_ak <- get_mapunit_from_GDB(dsn = "D:/geodata/soils/gNATSGO_AK_july2020.gdb", stats = TRUE)
+mu_ak$source <- "AK"
+# save(f_ak, mu_ak, file = "D:/geodata/project_data/gsp-bs/data/gnatsgo_ak.RData")
+load(file = "D:/geodata/project_data/gsp-bs/data/gnatsgo_ak.RData")
+
+
 
 # fetchSSURGO ----
 mu_us$idx <- rep(1:100, length.out = nrow(mu_us))
@@ -60,10 +67,11 @@ f_statsgo <- readRDS(file = "statsgo_sda.rds")
 
 f_us_seg      <- segment(f_us, intervals = c(0, 30))
 f_statsgo_seg <- segment(f_statsgo, intervals = c(0, 30))
+f_ak_seg      <- segment(f_ak, intervals = c(0, 30))
 
 h_us      <- horizons(f_us_seg)
 h_statsgo <- horizons(f_statsgo_seg)
-
+h_ak      <- horizons(f_ak_seg)
 
 
 
@@ -111,6 +119,26 @@ mu_agg <- h %>%
 mu_agg <- read.csv(file = "gnatsgo_gsoc.csv", stringsAsFactors = FALSE)
 
 
+s_ak <- cbind(source = "AK", site(f_ak))
+mu_ak_agg <- h_ak %>%
+  mutate(source = "AK", 
+         soc   = om_r / 1.724,
+         thk   = hzdepb_r - hzdept_r
+  ) %>%
+  group_by(source, cokey) %>%
+  summarize(clay_wt = weighted.mean(claytotal_r, w = thk, na.rm = TRUE)) %>%
+  right_join(s_ak,  by = c("cokey", "source")) %>%
+  right_join(mu_ak, by = c("mukey", "source")) %>%
+  group_by(source, mukey, musym, muname) %>%
+  summarize(
+    clay_wt = round(weighted.mean(clay_wt, w = comppct_r, na.rm = TRUE))
+  ) %>%
+  ungroup() %>%
+  as.data.frame()
+# write.csv(mu_ak_agg, file = "gnatsgo_ak_gsoc.csv", row.names = FALSE)
+mu_ak_agg <- read.csv(file = "gnatsgo_ak_gsoc.csv", stringsAsFactors = FALSE)
+
+
 
 # rasterize SSURGO ----
 
@@ -136,6 +164,51 @@ lapply(vars, function(x) {
   )
   # endCluster()
 })
+
+
+# AK
+r <- raster("D:/geodata/soils/gnatsgo_ak_july2020.tif")
+
+gdalUtilities::gdalwarp(
+  srcfile = "D:/geodata/soils/gnatsgo_ak_july2020.tif", 
+  dstfile = "D:/geodata/soils/gnatsgo_ak_july2020_90m.tif",
+  tr = c(90, 90),
+  ot = "Int32",
+  r = "mode"
+  )
+
+r2 <- raster("D:/geodata/soils/gnatsgo_ak_july2020_90m.tif")
+mu_agg2 <- subset(mu_ak_agg, source == "AK")[2:5]
+names(mu_agg2)[1] <- "ID"
+levels(r2) <- mu_agg2
+r2 <- readAll(r2)
+
+
+vars <- c("clay_wt")
+lapply(vars, function(x) {
+  cat(x, as.character(Sys.time()), "\n")
+  # beginCluster(type = "SOCK")
+  deratify(r2, att = x, 
+           filename = paste0("D:/geodata/project_data/gsp-gsocseq/gnatsgo_ak_fy20_90m_", x, ".tif"),
+           options = c("COMPRESS=DEFLATE"), 
+           overwrite = TRUE, 
+           progress = "text" 
+  )
+  # endCluster()
+})
+
+
+
+gdalUtilities::gdalwarp(
+  srcfile = "D:/geodata/project_data/gsp-gsocseq/gnatsgo_ak_fy20_90m_clay_wt.tif", 
+  dstfile = "D:/geodata/project_data/gsp-gsocseq/gnatsgo_ak_fy20_1km_clay_wt.tif",
+  tr = c(1000, 1000),
+  ot = "Int32",
+  r = "average",
+  srcnodata = -2147483648,
+  dstnodata = -9999,
+  overwrite = TRUE
+)
 
 
 system('"C:/OSGeo4W64/bin/gdalwarp.exe" -overwrite  -te -2356155 270045 2263815 3172635 -tr 1000 1000 -t_srs "EPSG:5070" -ot "Int32" -r "average" -of "GTiff" "D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_90m_clay_wt.tif" "D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_1km_clay_wt.tif"')

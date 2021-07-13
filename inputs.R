@@ -468,8 +468,8 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           NPP_MAX = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"
 )
 # LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
-# wu_rs  <- rast(vars)
-wu_rs  <- stack(vars)
+wu_rs  <- rast(vars)
+# wu_rs  <- stack(vars)
 
 su_pts$idx <- as.integer(
   cut(su_pts$id, 
@@ -477,19 +477,19 @@ su_pts$idx <- as.integer(
       include.lowest = TRUE)
 )
 
-test <- lapply(1, function(x) {
+test <- lapply(1:10, function(x) {
   cat("extracting part", x, as.character(Sys.time()), "\n")
-  # temp  <- vect(su_pts[which(su_pts$idx == x), ])
-  temp  <- su_pts[which(su_pts$idx == x), ]
-  # wu_ex <- extract(wu_rs, temp, xy = TRUE)
-  wu_ex <- as.data.frame(extract(wu_rs, temp, sp = TRUE, ))
+  temp  <- vect(su_pts[which(su_pts$idx == x), ])
+  # temp  <- su_pts[1:100, ]
+  wu_ex <- extract(wu_rs, temp, xy = TRUE)
+  # wu_ex <- as.data.frame(extract(wu_rs, temp, sp = TRUE))
   wu_ex <- cbind(idx = x, wu_ex)
   saveRDS(wu_ex, file = paste0("wu_pts_sub_", x, "_v2.rds"))
 })
 
 f_p <- paste0("wu_pts_sub_", 1:10, "_v2.rds")
 
-wu_pts_p1 <- lapply(f_p[1:5], function(x){
+wu_pts_p1 <- lapply(f_p[1], function(x){
   temp <- readRDS(file = x)
   })
 wu_pts_p1 <- data.table::rbindlist(wu_pts_p1)
