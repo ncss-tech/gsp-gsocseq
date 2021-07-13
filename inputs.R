@@ -564,8 +564,8 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
 fr_rs <- stack(vars)
 # writeRaster(fr_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
 fr_rs <- readAll(fr_rs)
-fr_pts <- extract(fr_rs, su_pts, sp = TRUE, progress = "text")
-saveRDS(fr_pts, file = "fr_sdf_v2.RDS")
+fr_pts <- extract(fr_rs, su_pts, cellnumbers = TRUE, df = TRUE, progress = "text")
+saveRDS(fr_pts, file = "fr_df_v2.RDS")
 
 
 

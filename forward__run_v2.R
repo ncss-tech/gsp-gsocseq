@@ -10,20 +10,20 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 
 
 # load forward stack
-fr_df <- as.data.frame(readRDS(file = "fr_sdf.RDS"))
-fr_df <- fr_df[complete.cases(fr_df), ]
-fr_sf <- st_as_sf(
-    fr_df,
-    coords = c("x", "y"),
-    crs    = 4326
-    ) %>%
-    st_transform(crs = 5070)
-fr_df <- cbind(id = 1:nrow(fr_sf), round(st_coordinates(fr_sf)), st_drop_geometry(fr_sf))
-fr_df$xy <- paste(fr_df$X, fr_df$Y, sep = "_")
+fr_df <- as.data.frame(readRDS(file = "fr_sdf_v2.RDS"))
+# fr_df <- fr_df[complete.cases(fr_df), ]
+# fr_sf <- st_as_sf(
+#     fr_df,
+#     coords = c("x", "y"),
+#     crs    = 4326
+#     ) %>%
+#     st_transform(crs = 5070)
+# fr_df <- cbind(id = 1:nrow(fr_sf), round(st_coordinates(fr_sf)), st_drop_geometry(fr_sf))
+# fr_df$xy <- paste(fr_df$X, fr_df$Y, sep = "_")
 
 
 # load warm up
-wu_df <- readRDS(file = "rothC_r_wu_final.rds")
+wu_df <- readRDS(file = "rothC_r_wu_final_v2.rds")
 wu_df$xy <- paste(wu_df$X, wu_df$Y, sep = "_")
 
 
