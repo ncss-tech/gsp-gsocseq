@@ -16,12 +16,12 @@ fr_sf <- read_sf(dsn = "rothC_fr_final.gpkg")
 
 
 vars <- c("bau", "baumin", "baumax", "low", "med", "high", "medmin", "medmax")
-vars <- paste0("f_t_", vars)
 
-lapply(vars, function(x) {
-  writeRaster(gsoc, paste0(aoi, "_fr_", x, ".tif"))
+lapply(vars[2:8], function(x) {
+  cat("rasterizing ", x, as.character(Sys.time()), "\n")
+  writeRaster(gsoc, paste0(aoi, "_fr_", x, ".tif"), overwrite = TRUE)
   test <- gdalUtilities::gdal_rasterize(
-    src_datasource = "rothC_fr_final.gpkg",
+    src_datasource = "rothC_fr_final_v2.gpkg",
     a              = paste0("f_t_", x),
     dst_filename   = paste0(aoi, "_fr_", x, ".tif"),
     of             = "GTiff",
