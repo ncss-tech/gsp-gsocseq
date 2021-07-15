@@ -2,6 +2,7 @@ library(raster)
 library(sf)
 library(rmapshaper)
 library(mapview)
+library(terra)
 
 wdir <- ("D:/geodata/project_data/gsp-gsocseq")
 setwd(wdir)
@@ -453,6 +454,9 @@ writeRaster(dr, file = "CONUS_glc_shv10_DOM_DR.tif", overwrite = TRUE)
 
 
 # Stack layers ----
+wdir <- ("D:/geodata/project_data/gsp-gsocseq")
+setwd(wdir)
+
 # Spin up layers
 vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           CLAY = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
@@ -504,8 +508,8 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           NPP_MAX = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"
 )
 # LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
-# wu_rs  <- rast(vars)
-wu_rs  <- stack(vars)
+wu_rs  <- rast(vars)
+# wu_rs  <- stack(vars)
 
 su_pts$id <- 1:nrow(su_pts)
 
@@ -517,19 +521,19 @@ su_pts$idx <- as.integer(
 
 test <- lapply(1:10, function(x) {
   cat("extracting part", x, as.character(Sys.time()), "\n")
-  # temp  <- vect(su_pts[which(su_pts$idx == x), ])
-  temp  <- su_pts[which(su_pts$idx == x), ]
-  # wu_ex <- extract(wu_rs, temp, xy = TRUE)
-  wu_ex <- as.data.frame(extract(wu_rs, temp, sp = TRUE, ))
+  temp  <- vect(su_pts[which(su_pts$idx == x), ])
+  # temp  <- su_pts[which(su_pts$idx == x), ]
+  wu_ex <- extract(wu_rs, temp, xy = TRUE)
+  # wu_ex <- as.data.frame(extract(wu_rs, temp, sp = TRUE, ))
   wu_ex <- cbind(idx = x, wu_ex)
-  saveRDS(wu_ex, file = paste0("wu_pts_sub_", x, "_v2.rds"))
+  saveRDS(as.data.frame(wu_ex), file = paste0("wu_pts_sub_", x, "_v2.rds"))
 })
 
 f_p <- paste0("wu_pts_sub_", 1:10, "_v2.rds")
 
 wu_pts_p1 <- lapply(f_p[1:5], function(x){
   temp <- readRDS(file = x)
-  })
+})
 wu_pts_p1 <- data.table::rbindlist(wu_pts_p1)
 data.table::fwrite(wu_pts_p1, file = "wu_pts_p1.csv")
 
@@ -542,8 +546,6 @@ data.table::fwrite(wu_pts_p2, file = "wu_pts_p2.csv")
 wu_pts_p1 <- data.table::fread(file = "wu_pts_p1.csv")
 wu_pts_p2 <- data.table::fread(file = "wu_pts_p2.csv")
 wu_pts <- rbind(wu_pts_p1, wu_pts_p2)
-
-# wu_pts <- readRDS(file = "wu_pts_sub_1_v2.rds")
 data.table::fwrite(wu_pts, file = "wu_pts_v2.csv")
 
 
@@ -604,7 +606,7 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
 fr_rs <- stack(vars)
 # writeRaster(fr_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
 fr_rs <- readAll(fr_rs)
-fr_pts <- extract(fr_rs, su_pts, sp = TRUE, progress = "text")
+fr_pts <- extract(fr_rs, su_pts, df = TRUE, cellnumbers = TRUE, progress = "text")
 saveRDS(fr_pts, file = "fr_sdf_v2.RDS")
 
 
