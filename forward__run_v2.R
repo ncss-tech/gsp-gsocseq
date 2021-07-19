@@ -10,7 +10,7 @@ setwd("D:/geodata/project_data/gsp-gsocseq")
 
 
 # load forward stack
-fr_df <- as.data.frame(readRDS(file = "fr_sdf_v2.RDS"))
+fr_df <- readRDS(file = "fr_df_v2.RDS")
 # fr_df <- fr_df[complete.cases(fr_df), ]
 # fr_sf <- st_as_sf(
 #     fr_df,
@@ -24,12 +24,14 @@ fr_df <- as.data.frame(readRDS(file = "fr_sdf_v2.RDS"))
 
 # load warm up
 wu_df <- readRDS(file = "rothC_r_wu_final_v2.rds")
-wu_df$xy <- paste(wu_df$X, wu_df$Y, sep = "_")
+names(wu_df)[c(1, 6)] <- c("ID1", "ID2")
+# wu_df$xy <- paste(wu_df$X, wu_df$Y, sep = "_")
 
 
 # combine
-fr_df <- merge(fr_df, wu_df, by = "xy", all.x = TRUE)
-fr_df <- fr_df[complete.cases(fr_df), ]
+# fr_df <- merge(fr_df, wu_df, by = "xy", all.x = TRUE)
+# fr_df <- fr_df[complete.cases(fr_df), ]
+fr_df <- cbind(fr_df, wu_df)
 
 
 # Set the increase in Carbon input for each land use and each scenario
@@ -62,7 +64,7 @@ fr_df <- within(fr_df, {
     CinputFORWARD_med_max <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), CinputFORWARD.max * 1.20 + 0.15, CinputFORWARD.max)
 })
 
-saveRDS(fr_df, file = "fr_df.rds")
+saveRDS(fr_df, file = "fr_df_v2_Cinputs.rds")
 
 
 # Extract variables
@@ -166,28 +168,23 @@ for (i in 1:ncol(fT_max)) {
 }
 
 
-xi_r   <- cbind(id = 1:nrow(xi_r),   xi_r)
-xi_min <- cbind(id = 1:nrow(xi_min), xi_min)
-xi_max <- cbind(id = 1:nrow(xi_max), xi_max)
-
-
-saveRDS(xi_r,   "fr_effcts_r.rds")
-saveRDS(xi_min, "fr_effcts_min.rds")
-saveRDS(xi_max, "fr_effcts_max.rds")
+saveRDS(xi_r,   "fr_effcts_r_v2.rds")
+saveRDS(xi_min, "fr_effcts_min_v2.rds")
+saveRDS(xi_max, "fr_effcts_max_v2.rds")
 
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
 years <- seq(1 / 12, 20, by = 1 / 12)
 
-fr_df <- readRDS("fr_df.rds")
+fr_df <- readRDS("fr_df_v2_Cinputs.rds")
 fr_df <- fr_df[!grepl("TEMP_|PREC_|PET_|COV_", names(fr_df))]
 fr_df$CLAY_min <- fr_df$CLAY * 0.9
 fr_df$CLAY_max <- fr_df$CLAY * 1.1
 
-xi_r   <- readRDS("fr_effcts_r.rds")
-xi_min <- readRDS("fr_effcts_min.rds")
-xi_max <- readRDS("fr_effcts_max.rds")
+xi_r   <- readRDS("fr_effcts_r_v2.rds")
+xi_min <- readRDS("fr_effcts_min_v2.rds")
+xi_max <- readRDS("fr_effcts_max_v2.rds")
 
 
 library(parallel)
@@ -206,13 +203,13 @@ rothC_bau <- parLapply(clus, 1:nrow(fr_df), function(i) {
         In   = fr_df$CinputFORWARD.r[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY[i],
-        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        effcts = data.frame(years, rep(unlist(xi_r[i, 1:12]), length.out = length(years))),
         solver = "euler"
     )
     fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_r, file = "rothC_fr_bau.rds")
+# saveRDS(rothC_bau, file = "rothC_fr_bau_v2.rds")
 stopCluster(clus)
 
 
@@ -230,19 +227,19 @@ rothC_fr_bau_min <- parLapply(clus, 1:nrow(fr_df), function(i) {
         In   = fr_df$CinputFORWARD.min[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY_min[i],
-        effcts = data.frame(years, rep(unlist(xi_min[i, 2:13]), length.out = length(years))),
+        effcts = data.frame(years, rep(unlist(xi_min[i, 1:12]), length.out = length(years))),
         solver = "euler"
     )
     fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_bau_min, file = "rothC_fr_bau_min.rds")
+# saveRDS(rothC_fr_bau_min, file = "rothC_fr_bau_min_v2.rds")
 stopCluster(clus)
 
 
 
 # Cinput bau max ----
-clus <- makeCluster(10)
+clus <- makeCluster(14)
 clusterExport(clus, list("fr_df", "xi_max", "years", "carbonTurnover"))
 
 Sys.time()
@@ -254,19 +251,19 @@ rothC_fr_bau_max <- parLapply(clus, 1:nrow(fr_df), function(i) {
         In   = fr_df$CinputFORWARD.max[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY_max[i],
-        effcts = data.frame(years, rep(unlist(xi_max[i, 2:13]), length.out = length(years))),
+        effcts = data.frame(years, rep(unlist(xi_max[i, 1:12]), length.out = length(years))),
         solver = "euler"
     )
     fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_bau_max, file = "rothC_fr_bau_max.rds")
+# saveRDS(rothC_fr_bau_max, file = "rothC_fr_bau_max_v2.rds")
 stopCluster(clus)
 
 
 
 # Cinput low ----
-clus <- makeCluster(10)
+clus <- makeCluster(14)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
 Sys.time()
@@ -278,19 +275,19 @@ rothC_fr_low <- parLapply(clus, 1:nrow(fr_df), function(i) {
         In   = fr_df$CinputFORWARD_low[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY[i],
-        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        effcts = data.frame(years, rep(unlist(xi_r[i, 1:12]), length.out = length(years))),
         solver = "euler"
     )
     fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_low, file = "rothC_fr_low.rds")
+# saveRDS(rothC_fr_low, file = "rothC_fr_low_v2.rds")
 stopCluster(clus)
 
 
 
 # Cinput med ----
-clus <- makeCluster(10)
+clus <- makeCluster(14)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
 Sys.time()
@@ -302,19 +299,19 @@ rothC_fr_med <- parLapply(clus, 1:nrow(fr_df), function(i) {
         In   = fr_df$CinputFORWARD_med[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY[i],
-        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        effcts = data.frame(years, rep(unlist(xi_r[i, 1:12]), length.out = length(years))),
         solver = "euler"
     )
     fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_med, file = "rothC_fr_med.rds")
+# saveRDS(rothC_fr_med, file = "rothC_fr_med_v2.rds")
 stopCluster(clus)
 
 
 
 # Cinput high ----
-clus <- makeCluster(10)
+clus <- makeCluster(14)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
 Sys.time()
@@ -326,19 +323,19 @@ rothC_fr_high <- parLapply(clus, 1:nrow(fr_df), function(i) {
         In   = fr_df$CinputFORWARD_high[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY[i],
-        effcts = data.frame(years, rep(unlist(xi_r[i, 2:13]), length.out = length(years))),
+        effcts = data.frame(years, rep(unlist(xi_r[i, 1:12]), length.out = length(years))),
         solver = "euler"
     )
     fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_high, file = "rothC_fr_high.rds")
+# saveRDS(rothC_fr_high, file = "rothC_fr_high_v2.rds")
 stopCluster(clus)
 
 
 
 # Cinput med min ----
-clus <- makeCluster(10)
+clus <- makeCluster(14)
 clusterExport(clus, list("fr_df", "xi_min", "years", "carbonTurnover"))
 
 Sys.time()
@@ -350,19 +347,19 @@ rothC_fr_medmin <- parLapply(clus, 1:nrow(fr_df), function(i) {
         In   = fr_df$CinputFORWARD_med_min[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY_min[i],
-        effcts = data.frame(years, rep(unlist(xi_min[i, 2:13]), length.out = length(years))),
+        effcts = data.frame(years, rep(unlist(xi_min[i, 1:12]), length.out = length(years))),
         solver = "euler"
     )
     fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_medmin, file = "rothC_fr_medmin.rds")
+# saveRDS(rothC_fr_medmin, file = "rothC_fr_medmin_v2.rds")
 stopCluster(clus)
 
 
 
 # Cinput med max ----
-clus <- makeCluster(10)
+clus <- makeCluster(14)
 clusterExport(clus, list("fr_df", "xi_max", "years", "carbonTurnover"))
 
 Sys.time()
@@ -374,13 +371,13 @@ rothC_fr_medmax <- parLapply(clus, 1:nrow(fr_df), function(i) {
         In   = fr_df$CinputFORWARD_med_max[i],
         Dr   = fr_df$DR[i],
         clay = fr_df$CLAY_max[i],
-        effcts = data.frame(years, rep(unlist(xi_max[i, 2:13]), length.out = length(years))),
+        effcts = data.frame(years, rep(unlist(xi_max[i, 1:12]), length.out = length(years))),
         solver = "euler"
     )
     fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_medmax, file = "rothC_fr_medmax.rds")
+# saveRDS(rothC_fr_medmax, file = "rothC_fr_medmax_v2.rds")
 stopCluster(clus)
 
 
@@ -388,14 +385,14 @@ stopCluster(clus)
 # load rothC outputs ----
 fr_df <- readRDS("fr_df.rds")
 
-rc_fr_bau    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau.rds")))
-rc_fr_baumin <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_min.rds")))
-rc_fr_baumax <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_max.rds")))
-rc_fr_low    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_low.rds")))
-rc_fr_med    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_med.rds")))
-rc_fr_high   <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_high.rds")))
-rc_fr_medmin <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_medmin.rds")))
-rc_fr_medmax <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_medmax.rds")))
+rc_fr_bau    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_v2.rds")))
+rc_fr_baumin <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_min_v2.rds")))
+rc_fr_baumax <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_max_v2.rds")))
+rc_fr_low    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_low_v2.rds")))
+rc_fr_med    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_med_v2.rds")))
+rc_fr_high   <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_high_v2.rds")))
+rc_fr_medmin <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_medmin_v2.rds")))
+rc_fr_medmax <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_medmax_v2.rds")))
 
 
 ids <- 1:nrow(rc_fr_bau)
@@ -412,16 +409,27 @@ rc_fr_all <- rbind(
 rc_fr_all$f_t <- rowSums(rc_fr_all[4:8])
 names(rc_fr_all)[4:8] <- c("DPM_fr", "RPM_fr", "BIO_fr", "HUM_fr", "IOM_fr")
 
-rc_fr_all <- reshape(rc_fr_all, direction = "wide",
-                     idvar = c("id"),
-                     timevar = "source", 
-                     v.names = names(rc_fr_all[c(4:9)])
+# rc_fr_all <- reshape(rc_fr_all, direction = "wide",
+#                      idvar   = "id",
+#                      timevar = "source", 
+#                      v.names = names(rc_fr_all[c(4:9)])
+# )
+
+
+library(data.table)
+
+rc_fr_all <- dcast(
+    as.data.table(rc_fr_all), 
+    id + time ~ source, 
+    value.var = c("DPM_fr", "RPM_fr", "BIO_fr", "HUM_fr", "IOM_fr", "f_t"),
+    sep = "."
 )
+rc_fr_all <- as.data.frame(rc_fr_all)
 
 vars <- c("x", "y", "SOC", "CLAY", "LU", "SOC_t0.r", "SOC_t0.min", "SOC_t0.max", "CinputFORWARD.r", "CinputFORWARD.min", "CinputFORWARD.max")
-names(fr_df)[3:6] <- vars[1:4]
+# names(fr_df)[3:6] <- vars[1:4]
 
-rc_fr_all2 <- cbind(fr_df[vars], rc_fr_all)
+rc_fr_all <- cbind(fr_df[vars], rc_fr_all)
 
 
 
@@ -440,12 +448,11 @@ names(rc_fr_all) <- gsub("\\.", "_", names(rc_fr_all))
 rc_fr_final <- st_as_sf(
     rc_fr_all,
     coords = c("x", "y"),
-    crs    = 5070
-    ) %>%
-    st_transform(4326)
+    crs    = 4326
+    )
 
-saveRDS(rc_fr_final, file = "rothC_fr_final.rds")
-write_sf(rc_fr_final, dsn = "rothC_fr_final.gpkg", driver = "GPKG", overwrite = TRUE) 
+saveRDS(rc_fr_final, file = "rothC_fr_final_v2.rds")
+write_sf(rc_fr_final, dsn = "rothC_fr_final_v2.gpkg", driver = "GPKG", overwrite = TRUE) 
 
 
 
