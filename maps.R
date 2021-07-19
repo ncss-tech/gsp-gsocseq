@@ -66,8 +66,7 @@ fr_sf <- st_as_sf(
   coords = c("x", "y"),
   crs    = 4326
 )
-write_sf(gsocseq_maps, dsn = "gsocseq_maps.gpkg", driver = "GPKG", overwrite = TRUE) 
-
+write_sf(fr_sf, dsn = "gsocseq_maps.gpkg", driver = "GPKG", overwrite = TRUE) 
 
 
 gsoc <- raster("CONUS_GSOCmap1.5.0.tif")
