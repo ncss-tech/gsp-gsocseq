@@ -55,13 +55,15 @@ High_PaddyFields <- 1.2
 
 
 # apply increase ----
+lu_cl <- c(2, 12, 3, 5, 6, 8, 13)
+
 fr_df <- within(fr_df, {
-    CinputFORWARD_low     <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), CinputFORWARD.r    * 1.05,        CinputFORWARD.r)
-    CinputFORWARD_med     <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), CinputFORWARD.r   * 1.10,        CinputFORWARD.r)
-    CinputFORWARD_high    <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), CinputFORWARD.r   * 1.20,        CinputFORWARD.r)
+    CinputFORWARD_low     <- ifelse(LU %in% lu_cl, CinputFORWARD.r   * 1.05,        CinputFORWARD.r)
+    CinputFORWARD_med     <- ifelse(LU %in% lu_cl, CinputFORWARD.r   * 1.10,        CinputFORWARD.r)
+    CinputFORWARD_high    <- ifelse(LU %in% lu_cl, CinputFORWARD.r   * 1.20,        CinputFORWARD.r)
     
-    CinputFORWARD_med_min <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), CinputFORWARD.min * 1.05 - 0.15, CinputFORWARD.min) 
-    CinputFORWARD_med_max <- ifelse(LU %in% c(2, 12, 3, 5, 6, 8, 13), CinputFORWARD.max * 1.20 + 0.15, CinputFORWARD.max)
+    CinputFORWARD_med_min <- ifelse(LU %in% lu_cl, CinputFORWARD.min * 1.05 - 0.15, CinputFORWARD.min) 
+    CinputFORWARD_med_max <- ifelse(LU %in% lu_cl, CinputFORWARD.max * 1.20 + 0.15, CinputFORWARD.max)
 })
 
 saveRDS(fr_df, file = "fr_df_v2_Cinputs.rds")
@@ -77,51 +79,6 @@ LU      <- fr_df$LU
 
 
 # Moisture effects per month ----
-fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
-    
-    M     <- PREC - PET * pE
-    
-    n    <- ncol(M)  / 12
-    idx  <- rep(1:12, n)
-    bare  <- as.data.frame(lapply(COV[, idx], function(x) x > 0.8))
-    
-    B <- as.data.frame(lapply(bare, function(x) ifelse(x == FALSE, 1, 1.8)))
-    Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23)
-    Max.TSMD <- as.data.frame(lapply(1 / B, function(x) x * Max.TSMD))
-    rm(B, bare)
-    
-    Acc.TSMD <- M
-    Acc.TSMD[, 1] <- ifelse(M[, 1] > 0, 0, M[, 1])
-    
-    for (i in 2:ncol(M)) {
-        Acc.TSMD_i <- Acc.TSMD[, i - 1] + M[, i]
-        Acc.TSMD[, i] <- ifelse(
-            Acc.TSMD_i < 0,
-            Acc.TSMD_i,
-            0
-        )
-        Acc.TSMD[, i] <- ifelse(
-            Acc.TSMD[, i] <= Max.TSMD[, i],
-            Max.TSMD[, i],
-            Acc.TSMD[, i]
-        )
-    }
-    
-    fW <- Acc.TSMD
-    
-    for (i in 1:ncol(fW)) {
-        fW[, i] <- ifelse(
-            Acc.TSMD[, i] > 0.444 * Max.TSMD[, i], 
-            1, 
-            (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i]) / (Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
-        )
-        fW[, i] <- raster::clamp(fW[, i], lower = 0.2)
-    }
-    
-    return(fW)
-}
-
-
 fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
 fW_min <- fW(pClay_r * 0.9, PREC * 0.95, PET, COV, s_thk = 30, pE = 1)
 fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
@@ -383,7 +340,10 @@ stopCluster(clus)
 
 
 # load rothC outputs ----
-fr_df <- readRDS("fr_df.rds")
+fr_df <- readRDS(file = "fr_df_v2.RDS")
+wu_df <- readRDS(file = "rothC_r_wu_final_v2.rds")
+names(wu_df)[c(1, 6)] <- c("ID1", "ID2")
+fr_df <- cbind(fr_df, wu_df)
 
 rc_fr_bau    <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_v2.rds")))
 rc_fr_baumin <- as.data.frame(do.call("rbind", readRDS(file = "rothC_fr_bau_min_v2.rds")))
@@ -429,30 +389,10 @@ rc_fr_all <- as.data.frame(rc_fr_all)
 vars <- c("x", "y", "SOC", "CLAY", "LU", "SOC_t0.r", "SOC_t0.min", "SOC_t0.max", "CinputFORWARD.r", "CinputFORWARD.min", "CinputFORWARD.max")
 # names(fr_df)[3:6] <- vars[1:4]
 
-rc_fr_all <- cbind(fr_df[vars], rc_fr_all)
+rc_fr_final <- cbind(fr_df[vars], rc_fr_all)
 
-
-
-# Uncertainties
-rc_fr_all <- within(rc_fr_all, {
-    unc_soc = (f_t.baumax - f_t.baumin) / (2 * f_t.bau)  * 100
-    unc_t0  = (SOC_t0.max - SOC_t0.min) / (2 * SOC_t0.r) * 100
-    unc_ssm = (f_t.medmax - f_t.medmin) / (2 * f_t.med)  * 100
-})
-
-
-
-# Convert to points
-names(rc_fr_all) <- gsub("\\.", "_", names(rc_fr_all))
-
-rc_fr_final <- st_as_sf(
-    rc_fr_all,
-    coords = c("x", "y"),
-    crs    = 4326
-    )
 
 saveRDS(rc_fr_final, file = "rothC_fr_final_v2.rds")
-write_sf(rc_fr_final, dsn = "rothC_fr_final_v2.gpkg", driver = "GPKG", overwrite = TRUE) 
 
 
 
