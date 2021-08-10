@@ -17,14 +17,17 @@ library(raster)
 library(rgdal)
 library(soilassessment)
 
+source('C:/Users/stephen.roecker/OneDrive - USDA/projects/gsp-gsocseq/code/functions.R')
+
 
 # Set working directory
-setwd("D:/geodata/project_data/gsp-gsocseq")
+setwd("D:/geodata/project_data/gsp-gsocseq/AK")
 
 
 # Stack_Set_1 is a stack that contains the spatial variables 
-su_sdf <- readRDS(file = "su_sdf_v2.RDS")
-su_df  <- as.data.frame(su_sdf)
+aoi    <- "AK"
+su_sf <- readRDS(file = paste0(aoi, "_su_sf.RDS"))
+su_df  <- as.data.frame(su_sf)
 
 
 # Extract the layers from the Vector
@@ -110,7 +113,8 @@ fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
 fW_min <- fW(pClay_r * 0.9, PREC * 0.95, PET, COV, s_thk = 30, pE = 1)
 fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
 
-    
+
+
 # Vegetation Cover effects ----
 fC <- COV
     
@@ -130,9 +134,10 @@ for (i in 1:ncol(fT_max)) {
   xi_max[, i] <- fT_max[, i] * fW_max[, i] * fC[, i] * fPR
 }
 
-saveRDS(xi_r,   "su_effcts_r.rds");   rm(su_sdf, TEMP, PREC, PET, COV, fC, fPR, xi_r, fT_r, fW_r)
-saveRDS(xi_min, "su_effcts_min.rds"); rm(su_sdf, xi_min, fT_min, fW_min)
-saveRDS(xi_max, "su_effcts_max.rds"); rm(xi_max, fT_max, fW_max, fC, fPR)
+saveRDS(xi_r,   paste0(aoi, "_su_effcts_r.rds"));   rm(su_sf, xi_r,   fT_r,   fW_r,   fPR, fC, TEMP, PREC, PET, COV)
+saveRDS(xi_min, paste0(aoi, "_su_effcts_min.rds")); rm(su_sf, xi_min, fT_min, fW_min, fPR, fC, TEMP, PREC, PET, COV)
+saveRDS(xi_max, paste0(aoi, "_su_effcts_max.rds")); rm(su_sf, xi_max, fT_max, fW_max, fPR, fC, TEMP, PREC, PET, COV)
+
 
 
 # # Roth C outputs
@@ -159,7 +164,7 @@ saveRDS(xi_max, "su_effcts_max.rds"); rm(xi_max, fT_max, fW_max, fC, fPR)
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
-su_df <- as.data.frame(readRDS(file = "su_sdf_v2.RDS"))
+su_df <- as.data.frame(readRDS(file = paste0(aoi, "_su_sf.RDS")))
 
 years <- seq(1 / 12, 500, by = 1 / 12)
 
@@ -184,9 +189,9 @@ fractI <- cbind(
   HUM = 0
   )
 
-xi_r   <- readRDS("su_effcts_r.rds")
-xi_min <- readRDS("su_effcts_min.rds")
-xi_max <- readRDS("su_effcts_max.rds")
+xi_r   <- readRDS(paste0(aoi, "su_effcts_r.rds"))
+xi_min <- readRDS(paste0(aoi, "_su_effcts_min.rds"))
+xi_max <- readRDS(paste0(aoi, "_su_effcts_max.rds"))
 
 xi_r2   <- rowMeans(xi_r)
 xi_min2 <- rowMeans(xi_min)
@@ -236,7 +241,7 @@ rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_r, file = "rothC_r_v3_analytical.rds")
+# saveRDS(rothC_r, file = paste0(aoi, "_rothC_r_v3_analytical.rds"))
 stopCluster(clus)
 
 
@@ -282,7 +287,7 @@ rothC_min <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_min, file = "rothC_min_v3_analytical.rds")
+# saveRDS(rothC_min, file = paste0(aoi, "_rothC_min_v3_analytical.rds"))
 stopCluster(clus)
 
 
@@ -326,33 +331,33 @@ rothC_max <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_max, file = "rothC_max_v3_analytical.rds")
+# saveRDS(rothC_max, file = paste0(aoi, "_rothC_max_v3_analytical.rds"))
 stopCluster(clus)
 
 
 
 rothC_r <- as.data.frame(
-  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r,
+  cbind(su_df[c("aoi", "cell", "X", "Y", "LU", "DR")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r,
         source = "r",
   do.call(
     "rbind", 
-    readRDS("rothC_r_v3_analytical.rds")
+    readRDS(paste0(aoi, "_rothC_r_v3_analytical.rds"))
     )))
 
 rothC_min <- as.data.frame(
-  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, 
+  cbind(su_df[c("aoi", "cell", "X", "Y", "LU", "DR")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, 
         source = "min",
   do.call(
     "rbind", 
-    readRDS("rothC_min_v3_analytical.rds")
+    readRDS(paste0(aoi, "_rothC_min_v3_analytical.rds"))
   )))
 
 rothC_max <- as.data.frame(
-  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, 
+  cbind(su_df[c("aoi", "cell", "X", "Y", "LU", "DR")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, 
         source = "max",
   do.call(
     "rbind", 
-    readRDS("rothC_max_v3_analytical.rds")
+    readRDS(paste0(aoi, "_rothC_max_v3_analytical.rds"))
   )))
 
 rothC_df <- rbind(rothC_r, rothC_min, rothC_max)
@@ -422,7 +427,7 @@ library(data.table)
 
 rothC_dfw2 <- dcast(
   as.data.table(rothC_df), 
-  id + x + y + LU + DR ~ source, 
+  cell + X + Y + LU + DR ~ source, 
   value.var = c("SOC", "FallIOM", "pClay", "fract.dpm", "fract.rpm", "fract.bio", "fract.hum", "fract.iom", "Cin", "fract.sum"),
   sep = "."
   )
@@ -434,5 +439,5 @@ rothC_dfw2 <- dcast(
 #   crs = 4326
 # )
 
-saveRDS(rothC_dfw2, file = "conus_su_results_v3_analytical.rds")
+saveRDS(as.data.frame(rothC_dfw2), file = paste0(aoi, "_su_results_v3_analytical.rds"))
 
