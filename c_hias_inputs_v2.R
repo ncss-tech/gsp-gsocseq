@@ -1,92 +1,92 @@
-rm(list = ls())
-
 library(raster)
 library(sf)
 library(rmapshaper)
 library(mapview)
 library(terra)
 
-
-wdir <- ("D:/geodata/project_data5/gsp-gsocseqwp")
+wdir <- ("D:/geodata/project_data2/gsp-gsocseqwp")
 setwd(wdir)
+source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
+
+rm(list = ls())
 
 # AOI ----
 # CONUS
-conus_sa <- read_sf(dsn = "D:/geodata/soils/gSSURGO_CONUS_FY20_july.gdb", layer = "SAPOLYGON")
-conus_sa <- conus_sa %>%
-  ms_simplify() %>%
-  mutate(asym = "CONUS") %>%
-  ms_dissolve(field = "asym")
-write_sf(conus_sa, dsn = "CONUS.shp")
-
-aoi_conus_bufbox <- conus_sa %>%
-  mutate(asym = "CONUS") %>%
-  ms_dissolve(field = "asym") %>%
-  st_buffer(dist = 1000 * 100) %>%
-  st_transform(crs = 4326) %>%
-  st_bbox() %>%
-  st_as_sfc()
-mapview::mapview(aoi_conus_bufbox)
-write_sf(aoi_conus_bufbox, dsn = "AOI_CONUS_bufbox.shp", delete_dsn = TRUE)
-
-
-# OCONUS
-asym <- c("AS", "AK", "FM", "GU", "HI", "MH", "MP", "PR", "PW", "VI")
-leg <- lapply(asym, function(x) get_legend_from_SDA(WHERE = paste0("areasymbol LIKE '", x, "%'")))
-leg <- do.call("rbind", leg)
-leg$asym <- substr(leg$areasymbol, 1, 2)
-
-sapol <- {
-  split(leg, leg$asym) ->.;
-  lapply(., function(x) {
-    cat("fetching ", x$areasymbol, "\n")
-    temp = fetchSDA_spatial(x$areasymbol, geom.src = "sapolygon")
-    temp = sf::st_as_sf(temp)
-  }) ->.;
-}
-# saveRDS(sapol, file = "sapol_oconus.rds")
-sapol <- readRDS("sapol_oconus.rds")
-
-sapol_bndy <- lapply(sapol, function(x) {
-  x$asym = substr(x$areasymbol, 1, 2)
-  # if (asym == "AK") {
-  #   split(x, x$areasymbol) ->.;
-  #   lapply(., function(x) {
-  #     test = as.data.frame(st_coordinates(x))
-  #     x$test = any(test$X > 0)
-  #     return(x)
-  #     }) ->.;
-  #   do.call("rbind", .) ->.;
-  # }
-  x$asym = ifelse(x$areasymbol %in% paste0("AK", 783:788), "AK2", x$asym)
-  temp = ms_simplify(x) %>%
-    ms_dissolve(field = "asym") %>%
-    ms_explode()
-  return(temp)
-})
-
-sapol_bufbox <- {
-  do.call("rbind", sapol_bndy) ->.;
-  split(., .$asym) ->.;
-  lapply(., function(x) {
-    temp <- x %>%
-      st_transform(crs = 6933) %>%
-      st_buffer(dist = 1000 * if(all(x$asym == "AK2")) 10 else 10) %>%
-      st_transform(crs = 4326) %>%
-      st_bbox() %>%
-      st_as_sfc() %>%
-      st_as_sf()
-    temp$asym <- unique(x$asym)
-    return(temp)
-  }) -> .;
-}
-test <- sapol_bufbox$PR
-mapview::mapview(test)
-
-lapply(sapol_bufbox, function(x) write_sf(x, dsn = paste0("AOI_OCONUS_", x$asym, "_bufbox.shp")))
-lapply(sapol_bndy, function(x)   write_sf(x, dsn = paste0("OCONUS_", x$asym, "_boundry.shp")))
-
-
+# conus_sa <- read_sf(dsn = "D:/geodata/soils/gSSURGO_CONUS_FY20_july.gdb", layer = "SAPOLYGON")
+# conus_sa <- conus_sa %>%
+#   ms_simplify() %>%
+#   mutate(asym = "CONUS") %>%
+#   ms_dissolve(field = "asym")
+# write_sf(conus_sa, dsn = "CONUS.shp")
+# 
+# aoi_conus_bufbox <- conus_sa %>%
+#   mutate(asym = "CONUS") %>%
+#   ms_dissolve(field = "asym") %>%
+#   st_buffer(dist = 1000 * 100) %>%
+#   st_transform(crs = 4326) %>%
+#   st_bbox() %>%
+#   st_as_sfc()
+# mapview::mapview(aoi_conus_bufbox)
+# write_sf(aoi_conus_bufbox, dsn = "AOI_CONUS_bufbox.shp", delete_dsn = TRUE)
+# 
+# 
+# # OCONUS
+# asym <- c("AS", "AK", "FM", "GU", "HI", "MH", "MP", "PR", "PW", "VI")
+# leg <- lapply(asym, function(x) get_legend_from_SDA(WHERE = paste0("areasymbol LIKE '", x, "%'")))
+# leg <- do.call("rbind", leg)
+# leg$asym <- substr(leg$areasymbol, 1, 2)
+# 
+# sapol <- {
+#   split(leg, leg$asym) ->.;
+#   lapply(., function(x) {
+#     cat("fetching ", x$areasymbol, "\n")
+#     temp = fetchSDA_spatial(x$areasymbol, geom.src = "sapolygon")
+#     temp = sf::st_as_sf(temp)
+#   }) ->.;
+# }
+# # saveRDS(sapol, file = "sapol_oconus.rds")
+# sapol <- readRDS("sapol_oconus.rds")
+# 
+# sapol_bndy <- lapply(sapol, function(x) {
+#   x$asym = substr(x$areasymbol, 1, 2)
+#   # if (asym == "AK") {
+#   #   split(x, x$areasymbol) ->.;
+#   #   lapply(., function(x) {
+#   #     test = as.data.frame(st_coordinates(x))
+#   #     x$test = any(test$X > 0)
+#   #     return(x)
+#   #     }) ->.;
+#   #   do.call("rbind", .) ->.;
+#   # }
+#   x$asym = ifelse(x$areasymbol %in% paste0("AK", 783:788), "AK2", x$asym)
+#   temp = ms_simplify(x) %>%
+#     ms_dissolve(field = "asym") %>%
+#     ms_explode()
+#   return(temp)
+# })
+# 
+# sapol_bufbox <- {
+#   do.call("rbind", sapol_bndy) ->.;
+#   split(., .$asym) ->.;
+#   lapply(., function(x) {
+#     temp <- x %>%
+#       st_transform(crs = 6933) %>%
+#       st_buffer(dist = 1000 * if(all(x$asym == "AK2")) 10 else 10) %>%
+#       st_transform(crs = 4326) %>%
+#       st_bbox() %>%
+#       st_as_sfc() %>%
+#       st_as_sf()
+#     temp$asym <- unique(x$asym)
+#     return(temp)
+#   }) -> .;
+# }
+# test <- sapol_bufbox$PR
+# mapview::mapview(test)
+# 
+# lapply(sapol_bufbox, function(x) write_sf(x, dsn = paste0("AOI_OCONUS_", x$asym, "_bufbox.shp")))
+# lapply(sapol_bndy, function(x)   write_sf(x, dsn = paste0("OCONUS_", x$asym, "_boundry.shp")))
+# 
+# 
 
 # GSOC ----
 aoi   <- read_sf(dsn = "AOIs/AOI_CONUS_bufbox.shp")
@@ -95,7 +95,7 @@ gsoc2 <- crop(gsoc, aoi)
 writeRaster(gsoc2, filename =  "CONUS_GSOCmap1.5.0.tif", progress = "text", overwrite = TRUE)
 gsoc2 <- raster("CONUS_GSOCmap1.5.0.tif")
 
-# cms_soc <- raster("D:/geodata2/soils/CMS_SOC_Mexico_CONUS_1737/data/SOC_prediction_1991_2010.tif")
+# cms_soc <- raster("D:/geodata/soils/CMS_SOC_Mexico_CONUS_1737/data/SOC_prediction_1991_2010.tif")
 # cms_soc_1km <- aggregate(cms_soc, fact = 4, fun = mean, progress = "text")
 # cms_soc_1km <- readAll(cms_soc_1km)
 # cms_soc_1km <- projectRaster(from = cms_soc_1km, to = ssurgo_st, filename = "cms_soc_1km.tif", method = "bilinear", progress = "text", overwrite = TRUE)
@@ -103,7 +103,7 @@ gsoc2 <- raster("CONUS_GSOCmap1.5.0.tif")
 
 
 # clay ----
-# clay <- raster("CONUS_gnatsgo_fy20_1km_clay_wt.tif")
+# clay <-raster("CONUS_gnatsgo_fy20_1km_clay_wt.tif")
 # clay_4326 <- projectRaster(
 #   clay,
 #   gsoc2,
@@ -427,7 +427,8 @@ writeRaster(npp8100_max_TnCHaYr_avg,
 # vars <- paste0("NDVI_2000-20_prop_gt_06_CR_MES_", formatC(1:12, width = 2, flag = "0"), "_conus.tif")
 
 vars <- paste0("M", formatC(1:12, width = 3, flag = "0"), "_NDVI_2000-2019_prop_gt_06_CR_MES_01.tif")
-               
+# vars2 <- list.files(".", pattern = "_CR_MES_01.tif$")               
+
 veg <- readAll(stack(vars))
 veg[is.na(veg)] <- 0
 veg <- (veg * -0.4) + 1
@@ -439,7 +440,7 @@ writeRaster(veg2, filename = "CONUS_Cov_stack_AOI.tif", options = c("COMPRESS=DE
 
 # Landcover ----
 # http://www.fao.org/geonetwork/srv/en/main.home?uuid=ba4526fd-cdbf-4028-a1bd-5a559c4bff38
-# lc <- raster("D:/geodata2/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
+# lc <- raster("D:/geodata/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
 lc <- raster("D:\\GIS\\PROJECT_21\\GSOCS\\R\\LU\\glc_shv10_DOM.Tif")
 projection(lc) <- "+init=epsg:4326"
 
@@ -457,7 +458,7 @@ writeRaster(dr, file = "CONUS_glc_shv10_DOM_DR.tif", overwrite = TRUE)
 
 
 # Stack layers ----
-# wdir <- ("D:/geodata/project_data2/gsp-gsocseq")
+# wdir <- ("D:/geodata/project_data2/gsp-gsocseqwp")
 # setwd(wdir)
 
 # Spin up layers
@@ -511,7 +512,6 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           NPP_MAX = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"
 )
 # LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
-library(terra)
 wu_rs  <- rast(vars)
 # wu_rs  <- stack(vars)
 

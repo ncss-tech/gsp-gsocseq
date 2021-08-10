@@ -19,7 +19,7 @@ library(soilassessment)
 
 
 # Set working directory
-setwd("D:/geodata/project_data5/gsp-gsocseqwp")
+setwd("D:/geodata/project_data3/gsp-gsocseqp")
 source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
 
 # Stack_Set_1 is a stack that contains the spatial variables 
@@ -220,7 +220,6 @@ clus <- makeCluster(4)
 # # saveRDS(rothC_r, file = "rothC_r_v3.rds")
 # stopCluster(clus)
 
-source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
 
 clus <- makeCluster(4)
 clusterExport(clus, list("SOC_r", "pClay_r", "xi_r2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))

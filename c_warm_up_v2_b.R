@@ -11,7 +11,7 @@ source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
 
 
 # Set working directory
-setwd("D:/geodata/project_data/gsp-gsocseq")
+setwd("D:/geodata/project_data5/gsp-gsocseqwp")
 
 
 # Load warm up data
@@ -365,7 +365,7 @@ xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv"))[idx, ]
 
 
 library(parallel)
-clus <- makeCluster(14)
+clus <- makeCluster(4)
 clusterExport(clus, list("idx", "su_df", "C_min", "xi_min", "years", "RothCModel", "getC", "rothC_wu_nn"))
 
 Sys.time()

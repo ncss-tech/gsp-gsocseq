@@ -6,10 +6,10 @@ library(rmapshaper)
 library(mapview)
 library(terra)
 
-
-wdir <- ("D:/geodata/project_data5/gsp-gsocseqwp")
+wdir <- ("D:/geodata/project_data3/gsp-gsocseqp")
 setwd(wdir)
 
+source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
 # AOI ----
 # CONUS
 conus_sa <- read_sf(dsn = "D:/geodata/soils/gSSURGO_CONUS_FY20_july.gdb", layer = "SAPOLYGON")
@@ -95,7 +95,7 @@ gsoc2 <- crop(gsoc, aoi)
 writeRaster(gsoc2, filename =  "CONUS_GSOCmap1.5.0.tif", progress = "text", overwrite = TRUE)
 gsoc2 <- raster("CONUS_GSOCmap1.5.0.tif")
 
-# cms_soc <- raster("D:/geodata2/soils/CMS_SOC_Mexico_CONUS_1737/data/SOC_prediction_1991_2010.tif")
+# cms_soc <- raster("D:/geodata/soils/CMS_SOC_Mexico_CONUS_1737/data/SOC_prediction_1991_2010.tif")
 # cms_soc_1km <- aggregate(cms_soc, fact = 4, fun = mean, progress = "text")
 # cms_soc_1km <- readAll(cms_soc_1km)
 # cms_soc_1km <- projectRaster(from = cms_soc_1km, to = ssurgo_st, filename = "cms_soc_1km.tif", method = "bilinear", progress = "text", overwrite = TRUE)
@@ -103,7 +103,7 @@ gsoc2 <- raster("CONUS_GSOCmap1.5.0.tif")
 
 
 # clay ----
-# clay <- raster("CONUS_gnatsgo_fy20_1km_clay_wt.tif")
+# clay <- readAll(raster("CONUS_gnatsgo_fy20_1km_clay_wt.tif"))
 # clay_4326 <- projectRaster(
 #   clay,
 #   gsoc2,
@@ -115,6 +115,7 @@ gsoc2 <- raster("CONUS_GSOCmap1.5.0.tif")
 # )
 
 # clay ----
+# setwd("D:/GIS/PROJECT_21/GSOCS/R/CLAY")
 setwd("D:\\GIS\\PROJECT_21\\GSOCS\\R\\CLAY")
 clay_src <- list.files(pattern = ".tif$")
 clay1 <- raster(clay_src[1])
@@ -439,7 +440,7 @@ writeRaster(veg2, filename = "CONUS_Cov_stack_AOI.tif", options = c("COMPRESS=DE
 
 # Landcover ----
 # http://www.fao.org/geonetwork/srv/en/main.home?uuid=ba4526fd-cdbf-4028-a1bd-5a559c4bff38
-# lc <- raster("D:/geodata2/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
+# lc <- raster("D:/geodata/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
 lc <- raster("D:\\GIS\\PROJECT_21\\GSOCS\\R\\LU\\glc_shv10_DOM.Tif")
 projection(lc) <- "+init=epsg:4326"
 
@@ -457,8 +458,8 @@ writeRaster(dr, file = "CONUS_glc_shv10_DOM_DR.tif", overwrite = TRUE)
 
 
 # Stack layers ----
-# wdir <- ("D:/geodata/project_data2/gsp-gsocseq")
-# setwd(wdir)
+wdir <- ("D:/geodata/project_data3/gsp-gsocseqp")
+setwd(wdir)
 
 # Spin up layers
 vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
@@ -511,7 +512,6 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           NPP_MAX = "CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"
 )
 # LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
-library(terra)
 wu_rs  <- rast(vars)
 # wu_rs  <- stack(vars)
 
@@ -608,7 +608,7 @@ vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
           COV  = "CONUS_Cov_stack_AOI.tif"
 )
 fr_rs <- stack(vars)
-writeRaster(fr_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
+# writeRaster(fr_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
 fr_rs <- readAll(fr_rs)
 fr_pts <- extract(fr_rs, su_pts, df = TRUE, cellnumbers = TRUE, progress = "text")
 saveRDS(fr_pts, file = "fr_sdf_v2.RDS")

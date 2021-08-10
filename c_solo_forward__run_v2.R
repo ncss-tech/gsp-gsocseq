@@ -4,12 +4,14 @@ library(SoilR)
 library(raster)
 library(rgdal)
 library(soilassessment)
-
-# Set working directory
-setwd("D:/geodata/project_data5/gsp-gsocseqwp")
+library(sf)
+library(mapview)
 
 # Vectorized NPPmodel
 source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
+
+# Set working directory
+setwd("D:/geodata/project_data3/gsp-gsocseqsolo")
 
 
 # load forward stack
@@ -224,6 +226,7 @@ rothC_bau <- parLapply(clus, 1:nrow(fr_df), function(i) {
     fp <- tail(temp, 1)
 })
 Sys.time()
+# saveRDS(rothC_r, file = "rothC_fr_bau.rds")
 saveRDS(rothC_bau, file = "rothC_fr_bau.rds")
 stopCluster(clus)
 
@@ -466,8 +469,8 @@ rc_fr_final <- st_as_sf(
     # ) %>%
     # st_transform(4326)
 
-saveRDS(rc_fr_final, file = "hias_rothC_fr_final.rds")
-write_sf(rc_fr_final, dsn = "hias_rothC_fr_final.gpkg", driver = "GPKG", overwrite = TRUE) 
+saveRDS(rc_fr_final, file = "rothC_fr_final.rds")
+write_sf(rc_fr_final, dsn = "rothC_fr_final.gpkg", driver = "GPKG", overwrite = TRUE) 
 
 
 
