@@ -53,8 +53,8 @@ mu_statsgo$idx <- rep(1:4, length.out = nrow(mu_statsgo))
 f_statsgo <- {
   split(mu_statsgo, mu_statsgo$idx) ->.;
   lapply(., function(x) {
-  cat("getting ", unique(x$idx), "\n")
-  temp <- fetchSDA(WHERE = paste("areasymbol = 'US' AND ", "mukey IN ('", paste0(x$mukey, collapse = "', '"), "')"), childs = FALSE, duplicates = TRUE)
+    cat("getting ", unique(x$idx), "\n")
+    temp <- fetchSDA(WHERE = paste("areasymbol = 'US' AND ", "mukey IN ('", paste0(x$mukey, collapse = "', '"), "')"), childs = FALSE, duplicates = TRUE)
   }) ->.;
 }
 f_statsgo <- aqp::combine(f_statsgo)
@@ -82,7 +82,7 @@ mu <- rbind(mu_us[idx], mu_statsgo[idx])
 idx <- siteNames(f_us)[siteNames(f_us) %in% siteNames(f_statsgo)]
 s <- rbind(cbind(source = "gnatsgo", site(f_us)[idx]), 
            cbind(source = "statsgo", site(f_statsgo)[idx])
-           )
+)
 
 idx <- sapply(h_us, is.factor)
 h_us[idx] <- lapply(h_us[idx], as.character)
@@ -95,24 +95,24 @@ h <- rbind(
   cbind(source = "gnatsgo", h_us[nm]),
   cbind(source = "statsgo", h_statsgo[nm])
 )
-  
+
 
 mu_agg <- h %>%
   mutate(soc   = om_r / 1.724,
          thk   = hzdepb_r - hzdept_r,
          stock = thk * (soc * dbthirdbar_r / 100) * ((100 - fragvol_r) / 100)
-         ) %>%
+  ) %>%
   group_by(source, cokey) %>%
   summarize(soc_wt  = weighted.mean(soc,         w = thk, na.rm = TRUE),
             clay_wt = weighted.mean(claytotal_r, w = thk, na.rm = TRUE) 
-            ) %>%
+  ) %>%
   right_join(s,  by = c("cokey", "source")) %>%
   right_join(mu, by = c("mukey", "source")) %>%
   group_by(source, mukey, musym, muname) %>%
   summarize(
     soc_wt  = round(weighted.mean(soc_wt,  w = comppct_r, na.rm = TRUE), 2),
     clay_wt = round(weighted.mean(clay_wt, w = comppct_r, na.rm = TRUE))
-    ) %>%
+  ) %>%
   ungroup() %>%
   as.data.frame()
 # write.csv(mu_agg, file = "gnatsgo_gsoc.csv", row.names = FALSE)
@@ -140,11 +140,65 @@ mu_ak_agg <- read.csv(file = "gnatsgo_ak_gsoc.csv", stringsAsFactors = FALSE)
 
 
 
-# rasterize SSURGO ----
+# rasterize ----
+
+## STATSGO2 ----
+
+# create temp
+r  <- raster("D:/geodata/soils/gnatsgo_fy20_30m_compress.tif")
+writeRaster(r, filename = "D:/geodata/soils/gstatsgo2_fy20_30m.tif", datatype = "INT4U", progress = "text", overwrite = TRUE)
+
+
+# load polygons and tidy
+gsm <- read_sf(dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us.shp")
+gsm$mukey2 <- as.integer(gsm$MUKEY)
+gsm <- st_transform(gsm, crs = proj4string(r))
+write_sf(gsm, dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp", delete_dsn = TRUE)
+
+
+# rasterize
+gdalUtilities::gdal_rasterize(
+  src_datasource = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp",
+  a              = "mukey2",
+  dst_filename   = "D:/geodata/soils/gstatsgo2_fy20_30m.tif",
+  of             = "GTiff",
+  te             = bbox(r),
+  tr             = res(r),
+  co             = c("COMPRESS=DEFLATE"),
+  a_nodata       = -99999
+)
+
+
+
+# deratify ----
+
+setwd("D:/geodata/project_data/gsp-gsocseq")
 
 library(raster)
-# library(terra)
+library(terra)
 
+mu_agg <- read.csv(file = "gnatsgo_gsoc.csv", stringsAsFactors = FALSE)
+mu_agg$mukey2 <- as.character(mu_agg$mukey)
+
+
+## gNATSGO ----
+
+# upscale
+gnatsgo   <- "D:/geodata/soils/gnatsgo_fy20_30m.tif"
+gnatsgo90 <- gsub("30m", "90m", gnatsgo)
+# if (file.exists(gnatsgo90)) file.remove(gnatsgo90)
+r <- raster(gnatsgo)
+gdalUtilities::gdalwarp(
+  srcfile   = gnatsgo,
+  dstfile   = gnatsgo90,
+  tr        = c(90, 90),
+  ot        = "Int32",
+  r         = "mode",
+  overwrite = TRUE
+)
+
+
+# attach attributes
 r <- raster("D:/geodata/soils/gnatsgo_fy20_90m.tif")
 # r2 <- r[1:100, 1:100, drop = FALSE]
 mu_agg2 <- subset(mu_agg, source == "gnatsgo")[2:6]
@@ -152,6 +206,8 @@ names(mu_agg2)[1] <- "ID"
 levels(r) <- mu_agg2
 r <- readAll(r)
 
+
+# deratify
 vars <- c("soc_wt", "clay_wt")
 lapply(vars, function(x) {
   cat(x, as.character(Sys.time()), "\n")
@@ -166,17 +222,37 @@ lapply(vars, function(x) {
 })
 
 
-# AK
-r <- raster("D:/geodata/soils/gnatsgo_ak_july2020.tif")
-
+# upscale again
 gdalUtilities::gdalwarp(
-  srcfile = "D:/geodata/soils/gnatsgo_ak_july2020.tif", 
-  dstfile = "D:/geodata/soils/gnatsgo_ak_july2020_90m.tif",
-  tr = c(90, 90),
+  srcfile = "D:/geodata/project_data/gsp-gsocseq/gnatsgo_ak_fy20_90m_clay_wt.tif", 
+  dstfile = "D:/geodata/project_data/gsp-gsocseq/gnatsgo_ak_fy20_1km_clay_wt.tif",
+  tr = c(1000, 1000),
   ot = "Int32",
-  r = "mode"
-  )
+  r = "average",
+  srcnodata = -2147483648,
+  dstnodata = -9999,
+  overwrite = TRUE
+)
 
+
+
+## AK ----
+
+# upscale
+ak   <- "D:/geodata/soils/gnatsgo_ak_july2020_30m.tif"
+ak90 <- gsub("30m", "90m", gnatsgo)
+# if (file.exists(ak90)) file.remove(akgo90)
+r  <- raster(ak)
+gdalUtilities::gdalwarp(
+  srcfile   = ak, 
+  dstfile   = ak90,
+  tr        = c(90, 90),
+  ot        = "Int32",
+  r         = "mode",
+  overwrite = TRUE
+)
+
+# attach attributes
 r2 <- raster("D:/geodata/soils/gnatsgo_ak_july2020_90m.tif")
 mu_agg2 <- subset(mu_ak_agg, source == "AK")[2:5]
 names(mu_agg2)[1] <- "ID"
@@ -184,6 +260,7 @@ levels(r2) <- mu_agg2
 r2 <- readAll(r2)
 
 
+# deratify
 vars <- c("clay_wt")
 lapply(vars, function(x) {
   cat(x, as.character(Sys.time()), "\n")
@@ -198,7 +275,7 @@ lapply(vars, function(x) {
 })
 
 
-
+# upscale again
 gdalUtilities::gdalwarp(
   srcfile = "D:/geodata/project_data/gsp-gsocseq/gnatsgo_ak_fy20_90m_clay_wt.tif", 
   dstfile = "D:/geodata/project_data/gsp-gsocseq/gnatsgo_ak_fy20_1km_clay_wt.tif",
@@ -209,62 +286,6 @@ gdalUtilities::gdalwarp(
   dstnodata = -9999,
   overwrite = TRUE
 )
-
-
-system('"C:/OSGeo4W64/bin/gdalwarp.exe" -overwrite  -te -2356155 270045 2263815 3172635 -tr 1000 1000 -t_srs "EPSG:5070" -ot "Int32" -r "average" -of "GTiff" "D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_90m_clay_wt.tif" "D:/geodata/project_data/gsp-gsocseq/ssurgo_fy20_1km_clay_wt.tif"')
-
-
-gnatsgo <- "D:/geodata/soils/gnatsgo_fy20_30m.tif"
-r <- raster(gnatsgo)
-
-gdalUtils::gdalwarp(
-  srcfile = gnatsgo,
-  dstfile = gsub("30m.tif", "120m.tif", gnatsgo),
-  t_srs = proj4string(r), 
-  te = bbox(r),
-  r = "mode",
-  tr = c(120, 120),
-  ot = "Int32",
-  verbose   = TRUE,
-  overwrite = TRUE
-)
-
-
-# rasterize STATSGO2
-
-library(sf)
-library(raster)
-library(gdalUtils)
-
-r  <- raster("D:/geodata/soils/gnatsgo_fy20_30m_compress.tif")
-writeRaster(r, filename = "D:/geodata/soils/gstatsgo2_fy20_30m.tif", datatype = "INT4U", progress = "text", overwrite = TRUE)
-
-mu_agg$mukey2 <- as.character(mu_agg$mukey)
-
-gsm <- read_sf(dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us.shp")
-gsm$mukey2 <- as.integer(gsm$MUKEY)
-gsm <- left_join(gsm, mu_agg[mu_agg$source == "statsgo", ], by = c("MUKEY" = "mukey2"))
-gsm <- st_transform(gsm, crs = proj4string(r))
-# write_sf(gsm, dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp", delete_dsn = TRUE)
-gsm <- read_sf(dsn = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp")
-
-
-
-# mukey
-vars <- c("mukey", "soc_wt", "clay_wt")[3]
-lapply(vars, function(x) {
-  cat("rasterizing ", x, "\n")
-  
-  prec <- ifelse(x == "soc_wt", "Float32", "Int32")
-  
-  system(paste0('"C:/OSGeo4W64/bin/gdal_rasterize.exe" -a "', x, '" -l "gsmsoilmu_a_us2" -te -2356155 269635 2263845 3172635 -tr 1000 1000 -ot ', prec, ' -a_nodata -9999 "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp" "D:/geodata/project_data/gsp-gsocseq/gstatsgo2_fy20_1km_"', x, '".tif"'))
-})
-
-system('"C:/OSGeo4W64/bin/gdal_rasterize.exe" -a "mukey2" -l "gsmsoilmu_a_us2" -te -2356155 270015 2263815 3172635 -tr 30 30 -ot Int32 "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp" "D:/geodata/soils/gstatsgo2_fy20_30m.tif"')
-
-
-
-system('"C:/OSGeo4W64/bin/gdalwarp.exe" -overwrite  -te -2356155 270015 2263815 3172635 -tr 1000 1000 -t_srs "+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs" -ot "Int32" -r "near" -of "GTiff" "D:/geodata/soils/gstatsgo2_fy20_30m.tif" "D:/geodata/soils/gstatsgo2_fy20_1km.tif"')
 
 
 
@@ -280,7 +301,7 @@ gnatsgo_clay <- merge(
   statsgo_st,
   filename = "gnatsgo_fy20_1km_clay_wt.tif",
   overwrite = TRUE
-  )
+)
 
 
 gnatsgo_soc <- merge(
