@@ -11,22 +11,24 @@
 #1045--1060. URL http://www.geosci-model-dev.net/5/1045/2012/gmd-5-1045-2012.html.
 #####################################
 
-
+# Setup ----
 library(SoilR)
 library(raster)
 library(rgdal)
 library(soilassessment)
 
+
 source('C:/Users/stephen.roecker/OneDrive - USDA/projects/gsp-gsocseq/code/functions.R')
 
 
-# Set working directory
+# set to aoi
 setwd("D:/geodata/project_data/gsp-gsocseq/AK")
 
 
+# Load inputs ----
+
 # Stack_Set_1 is a stack that contains the spatial variables 
-aoi    <- "AK"
-su_sf <- readRDS(file = paste0(aoi, "_su_sf.RDS"))
+su_sf <- readRDS(file = "su_sf.RDS")
 su_df  <- as.data.frame(su_sf)
 
 
@@ -134,9 +136,9 @@ for (i in 1:ncol(fT_max)) {
   xi_max[, i] <- fT_max[, i] * fW_max[, i] * fC[, i] * fPR
 }
 
-saveRDS(xi_r,   paste0(aoi, "_su_effcts_r.rds"));   rm(su_sf, xi_r,   fT_r,   fW_r,   fPR, fC, TEMP, PREC, PET, COV)
-saveRDS(xi_min, paste0(aoi, "_su_effcts_min.rds")); rm(su_sf, xi_min, fT_min, fW_min, fPR, fC, TEMP, PREC, PET, COV)
-saveRDS(xi_max, paste0(aoi, "_su_effcts_max.rds")); rm(su_sf, xi_max, fT_max, fW_max, fPR, fC, TEMP, PREC, PET, COV)
+saveRDS(xi_r,   "su_effcts_r.rds")
+saveRDS(xi_min, "su_effcts_min.rds")
+saveRDS(xi_max, "su_effcts_max.rds")
 
 
 
@@ -164,7 +166,7 @@ saveRDS(xi_max, paste0(aoi, "_su_effcts_max.rds")); rm(su_sf, xi_max, fT_max, fW
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
-su_df <- as.data.frame(readRDS(file = paste0(aoi, "_su_sf.RDS")))
+su_df <- as.data.frame(readRDS(file = "su_sf.RDS"))
 
 years <- seq(1 / 12, 500, by = 1 / 12)
 
@@ -189,9 +191,9 @@ fractI <- cbind(
   HUM = 0
   )
 
-xi_r   <- readRDS(paste0(aoi, "su_effcts_r.rds"))
-xi_min <- readRDS(paste0(aoi, "_su_effcts_min.rds"))
-xi_max <- readRDS(paste0(aoi, "_su_effcts_max.rds"))
+xi_r   <- readRDS("su_effcts_r.rds")
+xi_min <- readRDS("su_effcts_min.rds")
+xi_max <- readRDS("su_effcts_max.rds")
 
 xi_r2   <- rowMeans(xi_r)
 xi_min2 <- rowMeans(xi_min)
@@ -241,7 +243,7 @@ rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_r, file = paste0(aoi, "_rothC_r_v3_analytical.rds"))
+# saveRDS(rothC_r, file = "rothC_r_v3_analytical.rds")
 stopCluster(clus)
 
 
@@ -287,7 +289,7 @@ rothC_min <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_min, file = paste0(aoi, "_rothC_min_v3_analytical.rds"))
+# saveRDS(rothC_min, file = "rothC_min_v3_analytical.rds")
 stopCluster(clus)
 
 
@@ -331,17 +333,18 @@ rothC_max <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_max, file = paste0(aoi, "_rothC_max_v3_analytical.rds"))
+# saveRDS(rothC_max, file = "rothC_max_v3_analytical.rds")
 stopCluster(clus)
 
 
 
+# Outputs ----
 rothC_r <- as.data.frame(
   cbind(su_df[c("aoi", "cell", "X", "Y", "LU", "DR")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r,
         source = "r",
   do.call(
     "rbind", 
-    readRDS(paste0(aoi, "_rothC_r_v3_analytical.rds"))
+    readRDS("rothC_r_v3_analytical.rds")
     )))
 
 rothC_min <- as.data.frame(
@@ -349,7 +352,7 @@ rothC_min <- as.data.frame(
         source = "min",
   do.call(
     "rbind", 
-    readRDS(paste0(aoi, "_rothC_min_v3_analytical.rds"))
+    readRDS("rothC_min_v3_analytical.rds")
   )))
 
 rothC_max <- as.data.frame(
@@ -357,7 +360,7 @@ rothC_max <- as.data.frame(
         source = "max",
   do.call(
     "rbind", 
-    readRDS(paste0(aoi, "_rothC_max_v3_analytical.rds"))
+    readRDS("rothC_max_v3_analytical.rds")
   )))
 
 rothC_df <- rbind(rothC_r, rothC_min, rothC_max)
@@ -427,7 +430,7 @@ library(data.table)
 
 rothC_dfw2 <- dcast(
   as.data.table(rothC_df), 
-  cell + X + Y + LU + DR ~ source, 
+  cell + X + Y + aoi + LU + DR ~ source, 
   value.var = c("SOC", "FallIOM", "pClay", "fract.dpm", "fract.rpm", "fract.bio", "fract.hum", "fract.iom", "Cin", "fract.sum"),
   sep = "."
   )
@@ -438,6 +441,36 @@ rothC_dfw2 <- dcast(
 #   coords = c("x", "y"),
 #   crs = 4326
 # )
+rc_df <- as.data.frame(rothC_dfw2)
+saveRDS(rc_df, file = "su_results_v3_analytical.rds")
 
-saveRDS(as.data.frame(rothC_dfw2), file = paste0(aoi, "_su_results_v3_analytical.rds"))
 
+# inspect outputs
+rc_sf <- st_as_sf(
+  test,
+  coords = c("X", "Y"),
+  crs    = 4326
+)
+rc_sf <- rc_sf[rc_sf$aoi == "AK1", ]
+names(rc_sf) <- gsub("\\.", "_", names(rc_sf))
+write_sf(rc_sf, dsn = "test.gpkg", driver = "GPKG", overwrite = TRUE)
+
+aoi <- "AK1"
+gsoc <- rast(paste0(aoi, "_GSOCmap1.5.0.tif"))
+gsoc[!is.na(gsoc)] <- 1
+lu   <- rast(paste0(aoi, "_glc_shv10_DOM.tif"))
+lu   <- lu %in% c(2, 3, 5, 12, 13)
+gsoc <- gsoc * lu
+writeRaster(gsoc, "test_socfracsum.tif", overwrite = TRUE)
+
+gdalUtilities::gdal_rasterize(
+  src_datasource = "test.gpkg",
+  a              = "SOC_t0_r",
+  dst_filename   = "test_socfracsum.tif",
+  of             = "GTiff",
+  te             = bbox(gsoc),
+  tr             = res(gsoc),
+  co             = c("COMPRESS=DEFLATE"),
+  a_srs          = "EPSG:4326",
+  a_nodata       = -999
+)
