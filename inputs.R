@@ -155,6 +155,9 @@ clay_4326 <- projectRaster(
 )
 
 ## AK ----
+aoi <- "AK1"
+aoi <- "AK2"
+
 gsoc_ak <- rast(paste0(aoi, "_GSOCmap1.5.0.tif"))
 clay_ak <- rast("gnatsgo_ak_fy20_1km_clay_wt.tif")
 clay_ak <- resample(
@@ -704,20 +707,32 @@ saveRDS(wu_ex, file = paste0(aoi, "_wu_df.rds"))
 
 
 ## Forward Run ----
-vars <- c(SOC  = "CONUS_GSOCmap1.5.0.tif",
-          CLAY = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
-          TEMP = "CONUS_Temp_Stack_01-19_TC.tif",
-          PREC = "CONUS_Prec_Stack_01-19_TC.tif",
-          PET  = "CONUS_PET_Stack_01-19_TC.tif",
-          LU   = "CONUS_glc_shv10_DOM.tif",
-          DR   = "CONUS_glc_shv10_DOM_DR.tif",
-          COV  = "CONUS_Cov_stack_AOI.tif"
+aoi <- "AK2"
+
+su_sf <- readRDS(file = paste0(aoi, "_su_sf.RDS"))
+
+vars <- c(SOC  = paste0(aoi, "_GSOCmap1.5.0.tif"),
+          CLAY = paste0(aoi, "_gnatsgo_fy20_1km_clay_wt.tif"),
+          TEMP = paste0(aoi, "_Temp_Stack_01-19_TC.tif"),
+          PREC = paste0(aoi, "_Prec_Stack_01-19_TC.tif"),
+          PET  = paste0(aoi, "_PET_Stack_01-19_TC.tif"),
+          LU   = paste0(aoi, "_glc_shv10_DOM.tif"),
+          DR   = paste0(aoi, "_glc_shv10_DOM_DR.tif"),
+          COV  = paste0(aoi, "_Cov_stack_AOI.tif")
 )
-fr_rs <- stack(vars)
-# writeRaster(fr_rs, filename = "Stack_Set_FOWARD.tif", progress = "text", overwrite = TRUE)
-fr_rs <- readAll(fr_rs)
-fr_pts <- extract(fr_rs, su_pts, cellnumbers = TRUE, df = TRUE, progress = "text")
-saveRDS(fr_pts, file = "fr_df_v2.RDS")
+fr_rs <- lapply(names(vars), function(x) {
+  r <- rast(vars[x])
+  n <- nlyr(r)
+  names(r) <- if (n > 1) {
+    paste0(x, "_", formatC(1:nlyr(r), width = 2, flag = "0"))
+  } else x
+  return(r)
+})
+fr_rs <- rast(fr_rs)
+
+su_v  <- vect(su_sf)
+fr_df <- extract(fr_rs, su_v, xy = TRUE, cells = TRUE)
+saveRDS(fr_df, file = paste0(aoi, "_fr_df.RDS"))
 
 
 
@@ -726,20 +741,28 @@ su_ak1 <- readRDS("AK1_su_sf.RDS")
 su_ak2 <- readRDS("AK2_su_sf.RDS")
 wu_ak1 <- readRDS("AK1_wu_df.rds")
 wu_ak2 <- readRDS("AK2_wu_df.rds")
+fr_ak1 <- readRDS("AK1_fr_df.rds")
+fr_ak2 <- readRDS("AK2_fr_df.rds")
 
 su_ak <- rbind(
     cbind(aoi = "AK1", su_ak1),
     cbind(aoi = "AK2", su_ak2)
   )
 su_ak <- cbind(sf::st_coordinates(su_ak), su_ak)
-saveRDS(su_ak, file = "AK_su_sf.RDS")
+saveRDS(su_ak, file = "su_sf.RDS")
 
 wu_ak <- rbind(
     cbind(aoi = "AK1", wu_ak1),
     cbind(aoi = "AK2", wu_ak2)
 )
-saveRDS(wu_ak, file = "AK_wu_df.RDS")
+saveRDS(wu_ak, file = "wu_df.RDS")
+data.table::fwrite(wu_ak, file = "wu_df.csv")
 
+fr_ak <- rbind(
+  cbind(aoi = "AK1", fr_ak1),
+  cbind(aoi = "AK2", fr_ak2)
+)
+saveRDS(fr_ak, file = "fr_df.RDS")
 
 
 # inspect outputs
