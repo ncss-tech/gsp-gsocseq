@@ -1,14 +1,14 @@
+
+# Setup ----
 library(sf)
-library(raster)
-
-
-# Set working directory
-setwd("D:/geodata/project_data/gsp-gsocseq")
+library(terra)
 
 aoi <- "CONUS"
+setwd(paste0("D:/geodata/project_data/gsp-gsocseq/", aoi))
 
-su_sdf <- readRDS(file = "su_sdf.RDS")
-fr_df  <- readRDS(file = "rothC_fr_final_v2.rds")
+
+fr_df  <- readRDS(file = "rothC_fr_final.rds")
+fr_df  <- cbind(aoi = aoi, fr_df)
 
 
 # Differences, Rates, and Uncertainties,
@@ -60,12 +60,12 @@ gsocseq_maps <- within(fr_df, {
     abs(f_t.bau + f_t.high)
 })
 
-vars  <- c("id", "x", "y", "LU", "CLAY", "SOC")
 names(gsocseq_maps) <- gsub("\\.", "_", names(gsocseq_maps))
 nm    <- names(gsocseq_maps)
+vars  <- c("aoi", "x", "y", "cell", "LU", "CLAY", "SOC")
 vars2 <- nm[grep("^finalSOC|^T0|_Uncertainty$|^AbsDiff|^RelDiff|^ASR|^RSR", nm)]
 gsocseq_maps <- gsocseq_maps[c(vars, vars2)]
-
+saveRDS(gsocseq_maps, file = "gsocseq_maps.rds")
 
 
 # Convert to points
@@ -74,36 +74,86 @@ fr_sf <- st_as_sf(
   coords = c("x", "y"),
   crs    = 4326
 )
-write_sf(fr_sf, dsn = "gsocseq_maps.gpkg", driver = "GPKG", overwrite = TRUE) 
-test <- read_sf(dsn = "gsocseq_maps.gpkg", driver = "GPKG")
+
+ak1_fr_sf <- fr_sf[fr_sf$aoi == "AK1", ]
+ak2_fr_sf <- fr_sf[fr_sf$aoi == "AK2", ]
+
+write_sf(ak1_fr_sf, dsn = paste0("AK1_gsocseq_maps.gpkg"), driver = "GPKG", overwrite = TRUE) 
+write_sf(ak2_fr_sf, dsn = paste0("AK2_gsocseq_maps.gpkg"), driver = "GPKG", overwrite = TRUE) 
 
 
-gsoc <- raster("CONUS_GSOCmap1.5.0.tif")
+aoi <- "AK2"
+gsoc <- rast(paste0(aoi, "_GSOCmap1.5.0.tif"))
 gsoc[!is.na(gsoc)] <- 1
-lu   <- raster("CONUS_glc_shv10_DOM.tif")
+lu   <- rast(paste0(aoi, "_glc_shv10_DOM.tif"))
 lu   <- lu %in% c(2, 3, 5, 12, 13)
 gsoc <- gsoc * lu
-
 
 
 # rasterize points
 lapply(vars2, function(x) {
   
   f <- paste0(aoi, "_GSOCseq_", x, "Map030.tif")
+  if (file.exists(f)) file.remove(f)
+  
   cat("rasterizing ", f, as.character(Sys.time()), "\n")
   writeRaster(gsoc, f, overwrite = TRUE)
   
-  test <- gdalUtilities::gdal_rasterize(
-    src_datasource = "gsocseq_maps.gpkg",
+  gdalUtilities::gdal_rasterize(
+    src_datasource = paste0(aoi, "_gsocseq_maps.gpkg"),
     a              = x,
     dst_filename   = f,
     of             = "GTiff",
     te             = bbox(gsoc),
     tr             = res(gsoc),
-    co             = c("TILED=YES", "COMPRESS=DEFLATE"),
-    a_nodata       = -99999
+    co             = c("COMPRESS=DEFLATE"),
+    a_nodata       = -999
     )
 })
+
+
+
+# QA results ----
+gsocseq_maps <- readRDS("gsocseq_maps.rds")
+nm    <- names(gsocseq_maps)
+vars  <- c("aoi", "x", "y", "cell", "LU", "CLAY", "SOC")
+vars2 <- nm[grep("^finalSOC|^T0|_Uncertainty$|^AbsDiff|^RelDiff|^ASR|^RSR", nm)]
+
+summary(gsocseq_maps)
+
+test <- data.frame(t(sapply(vars2, function(x) rbind(quantile(gsocseq_maps[, x], na.rm = TRUE)))))
+test <- round(test, 2)
+names(test) <- paste0("p", seq(0, 1, 0.25))
+test <- cbind(var = row.names(test), test)
+row.names(test) <- NULL
+View(test)
+write.csv(test, "gsocseq_summaries.csv", row.names = FALSE)
+
+
+aoi <- "CONUS"
+f   <- paste0(aoi, "_GSOCseq_", vars2, "Map030.tif")
+rs  <- rast(f) 
+names(rs) <- vars2
+
+
+vars <- c(pred     = "final|T0_$", 
+          pred_unc = "^..._Uncertainty$|^.._Uncertainty",
+          abs_diff = "AbsDiff", 
+          rel_diff = "RelDiff",
+          asr      = "ASR_SSM._$|ASR_BAU_$",
+          rsr      = "RSR_SSM._$",
+          asr_unc  = "ASR_...._Uncertainty",
+          rsr_unc  = "RSR_...._Uncertainty"
+          )
+
+lapply(seq_along(vars)[5], function(i) {
+  idx <- grepl(vars[i], names(rs))
+  brks <- quantile(values(rs[[idx]]), probs = seq(0, 1, 0.1), na.rm = TRUE)
+  png(paste0("plots_", aoi, "_", names(vars)[i], ".png"), units = "in", width = 12, height = 6, res = 300)
+  plot(rs[[idx]], breaks = brks, col = viridis::viridis(10))
+  dev.off()
+})
+
 
 
 
