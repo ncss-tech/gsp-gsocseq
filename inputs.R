@@ -143,16 +143,25 @@ cms_soc_1km <- projectRaster(from = cms_soc_1km, to = ssurgo_st, filename = "cms
 
 # clay ----
 ## CONUS ----
-clay <- raster("CONUS/gnatsgo_fy20_1km_clay_wt.tif")
-clay_4326 <- projectRaster(
-  clay, 
-  gsoc2, 
-  filename = "CONUS_gnatsgo_fy20_1km_clay_wt.tif", 
-  method = "bilinear", 
-  progress = "text", 
-  overwrite = TRUE, 
-  datatype = "INT4S"
+gdalUtilities::gdalwarp(
+  srcfile = "gnatsgo_fy20_1km_clay_wt.tif",
+  dstfile = "CONUS_gnatsgo_fy20_1km_clay_wt.tif",
+  t_srs   = crs(gsoc2),
+  te      = c(bbox(gsoc2)),
+  tr      = res(gsoc2),
+  r       = "bilinear"
 )
+# clay <- raster("gnatsgo_fy20_1km_clay_wt.tif")
+# clay_4326 <- projectRaster(
+#   clay, 
+#   gsoc2, 
+#   filename = "CONUS_gnatsgo_fy20_1km_clay_wt.tif", 
+#   method = "bilinear", 
+#   progress = "text", 
+#   overwrite = TRUE, 
+#   datatype = "INT4S"
+# )
+
 
 ## AK ----
 aoi <- "AK1"
@@ -172,9 +181,9 @@ clay_ak <- resample(
 
 
 # TerraClimate ----
-setwd("D:/geodata/project_data/gsp-gsocseq/AK")
+setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 
-aoi <- "AK2"
+aoi <- "CONUS"
 
 ## Resample original data to GSOC extent ----
 gsoc2 <- rast(paste0(aoi, "_GSOCmap1.5.0.tif"))
@@ -279,7 +288,7 @@ gdalUtilities::gdalwarp(
 
 
 ## load data ----
-aoi <- "AK2"
+aoi <- "CONUS"
 tmp8100 <- rast(paste0(aoi, "_Temp_Stack_228_81_00_TC.tif"))
 tmp0119 <- rast(paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"))
 ppt8100 <- rast(paste0(aoi, "_Prec_Stack_228_81_00_TC.tif"))
@@ -434,21 +443,27 @@ writeRaster(npp8100_TnCHaYr_avg, filename = paste0(aoi, "_NPP_MIAMI_MEAN_81-00_A
 # Uncertainties ----
 
 ## Min ----
-tmp8100 <- rast(paste0(aoi, "_Temp_Stack_228_81_00_TC.tif"))
-ppt8100 <- rast(paste0(aoi, "_Prec_Stack_228_81_00_TC.tif"))
+# tmp8100 <- rast(paste0(aoi, "_Temp_Stack_228_81_00_TC.tif"))
+# ppt8100 <- rast(paste0(aoi, "_Prec_Stack_228_81_00_TC.tif"))
+# 
+# tmp8100_min <- tmp8100 * 1.02
+# ppt8100_min <- ppt8100 * 0.95
+# 
+# tmp8100_min_avg <- avgRS(tmp8100_min, "tmmx", yrs8100) * 0.1
+# ppt8100_min_avg <- avgRS(ppt8100_min, "pr", yrs8100)
 
-tmp8100_min <- tmp8100 * 1.02
-ppt8100_min <- ppt8100 * 0.95
+tmp8100_avg_yr <- rast(paste0(aoi, "_Temp_Stack_81-00_TC_yr.tif"))
+ppt8100_avg_yr <- rast(paste0(aoi, "_Prec_Stack_81-00_TC_yr.tif"))
 
-tmp8100_min_avg <- avgRS(tmp8100_min, "tmmx", yrs8100) * 0.1
-ppt8100_min_avg <- avgRS(ppt8100_min, "pr", yrs8100)
+tmp8100_min_avg <- tmp8100_avg_yr * 1.02
+ppt8100_min_avg <- ppt8100_avg_yr * 0.95
 
-npp8100_min_avg_tmp <- 3000 * (1 - exp(-0.000664 * ppt8100_min_avg))
-npp8100_min_avg_ppt <- 3000 / (1 + exp(1.315 - 0.119 * tmp8100_min_avg))
+npp8100_min_avg_ppt <- 3000 * (1 - exp(-0.000664     * ppt8100_min_avg))
+npp8100_min_avg_tmp <- 3000 / (1 + exp(1.315 - 0.119 * tmp8100_min_avg))
 
 npp8100_min <- lapply(1:20, function(i) {
   cat("calculating min from ", i, "\n")
-  npp <- min(npp8100_min_avg_tmp[[i]], npp8100_min_avg_tmp[[i]], na.rm = TRUE)
+  npp <- min(npp8100_min_avg_ppt[[i]], npp8100_min_avg_tmp[[i]], na.rm = TRUE)
 })
 npp8100_min <- rast(npp8100_min)
 npp8100_min_TnCHaYr <- npp8100_min * 1/100 * 0.5
@@ -469,21 +484,27 @@ writeRaster(npp8100_min_TnCHaYr_avg,
 
 
 ## Max ----
-tmp0119 <- rast(paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"))
-ppt0119 <- rast(paste0(aoi, "_Prec_Stack_228_01_19_TC.tif"))
+# tmp0119 <- rast(paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"))
+# ppt0119 <- rast(paste0(aoi, "_Prec_Stack_228_01_19_TC.tif"))
+# 
+# tmp8100_max <- tmp8100 * 0.98
+# ppt8100_max <- ppt8100 * 1.05
+# 
+# tmp8100_max_avg <- avgRS(tmp8100_max, "tmmx", yrs8100) * 0.1
+# ppt8100_max_avg <- avgRS(ppt8100_max, "pr",   yrs8100)
 
-tmp8100_max <- tmp8100 * 0.98
-ppt8100_max <- ppt8100 * 1.05
+tmp8100_avg_yr <- rast(paste0(aoi, "_Temp_Stack_81-00_TC_yr.tif"))
+ppt8100_avg_yr <- rast(paste0(aoi, "_Prec_Stack_81-00_TC_yr.tif"))
 
-tmp8100_max_avg <- avgRS(tmp8100_max, "tmmx", yrs8100) * 0.1
-ppt8100_max_avg <- avgRS(ppt8100_max, "pr",   yrs8100)
+tmp8100_max_avg <- tmp8100_avg_yr * 0.98
+ppt8100_max_avg <- ppt8100_avg_yr * 1.05
 
-npp8100_max_avg_tmp <- 3000 * (1 - exp(-0.000664     * ppt8100_max_avg))
-npp8100_max_avg_ppt <- 3000 / (1 + exp(1.315 - 0.119 * tmp8100_max_avg))
+npp8100_max_avg_ppt <- 3000 * (1 - exp(-0.000664     * ppt8100_max_avg))
+npp8100_max_avg_tmp <- 3000 / (1 + exp(1.315 - 0.119 * tmp8100_max_avg))
 
-npp8100_max <- lapply(1:19, function(i) {
+npp8100_max <- lapply(1:20, function(i) {
   cat("calculating min from ", i, "\n")
-  npp <- min(npp8100_max_avg_tmp[[i]], npp8100_max_avg_tmp[[i]], na.rm = TRUE)
+  npp <- min(npp8100_max_avg_ppt[[i]], npp8100_max_avg_tmp[[i]], na.rm = TRUE)
 })
 npp8100_max         <- rast(npp8100_max)
 npp8100_max_TnCHaYr <- npp8100_max * 1/100 * 0.5
@@ -507,10 +528,11 @@ writeRaster(npp8100_max_TnCHaYr_avg,
 
 
 # Vegetation Cover ----
-aoi <- "AK2"
+aoi <- "CONUS"
 gsoc2 <- rast(paste0(aoi, "_GSOCmap1.5.0.tif"))
 
-vars <- paste0(aoi, "_NDVI_2000-2020_prop_gt_06_CR_MES_", formatC(1:12, width = 2, flag = "0"), ".tif")
+# vars <- paste0(aoi, "_NDVI_2000-2020_prop_gt_06_CR_MES_", formatC(1:12, width = 2, flag = "0"), ".tif")
+vars <- paste0("NDVI_2000-2020_prop_gt_06_CR_MES_", formatC(1:12, width = 2, flag = "0"), "_conus.tif")
 veg <- rast(vars)
 veg[is.na(veg)] <- 0
 veg <- (veg * -0.4) + 1
@@ -540,7 +562,7 @@ writeRaster(veg2, filename = paste0(aoi, "_Cov_stack_AOI.tif"), gdal = c("COMPRE
 
 # Landcover ----
 # http://www.fao.org/geonetwork/srv/en/main.home?uuid=ba4526fd-cdbf-4028-a1bd-5a559c4bff38
-aoi <- "AK2"
+aoi <- "CONUS"
 gsoc2 <- rast(paste0(aoi, "_GSOCmap1.5.0.tif"))
 
 lc <- rast("D:/geodata/land_use_land_cover/GlcShare_v10_Dominant/glc_shv10_DOM.Tif")
@@ -560,6 +582,9 @@ writeRaster(dr, file = paste0(aoi, "_glc_shv10_DOM_DR.tif"), overwrite = TRUE)
 
 
 # Stack layers ----
+
+aoi <- "CONUS"
+setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 
 ## Spin up layers ----
 vars <- c(SOC  = paste0(aoi, "_GSOCmap1.5.0.tif"),
