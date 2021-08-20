@@ -11,7 +11,7 @@ source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
 
 
 # Set working directory
-setwd("D:/geodata/project_data5/gsp-gsocseqwp")
+setwd("D:\\geodata\\fin_project_data4\\fin_project_data5\\gsp-gsocseq_pe")
 
 
 # Load warm up data
@@ -134,9 +134,10 @@ C_max <- cbind(replicate(19, wu_df$Cin.max))
 # C_min <- apply(C_min, 2, function(x) ifelse(is.na(x), 0, x))
 # C_max <- apply(C_max, 2, function(x) ifelse(is.na(x), 0, x))
 
-C_rv[, 1]  <- C_rv[, 1]  / NPP_M[, 1]     * NPP_M[, 1]
-C_min[, 1] <- C_min[, 1] / NPP_M_min[, 1] * NPP_M_min[, 1]
-C_max[, 1] <- C_max[, 1] / NPP_M_max[, 1] * NPP_M_max[, 1]
+# this line
+C_rv[, 1]  <- C_rv[, 1]  / NPP_rv     * NPP_M[, 1]
+C_min[, 1] <- C_min[, 1] / NPP_min * NPP_M_min[, 1]
+C_max[, 1] <- C_max[, 1] / NPP_max * NPP_M_max[, 1]
 
 
 idx <- 2:19

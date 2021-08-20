@@ -4,9 +4,10 @@ library(SoilR)
 library(raster)
 library(rgdal)
 library(soilassessment)
+library(mapview)
 
 # Set working directory
-setwd("D:/geodata/project_data5/gsp-gsocseqwp")
+setwd("D:\\geodata\\fin_project_data4\\fin_project_data5\\gsp-gsocseq")
 
 # Vectorized NPPmodel
 source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
@@ -455,7 +456,7 @@ rc_fr_all <- within(rc_fr_all2, {
 })
 
 
-
+library(sf)
 # Convert to points
 names(rc_fr_all) <- gsub("\\.", "_", names(rc_fr_all))
 
@@ -466,8 +467,8 @@ rc_fr_final <- st_as_sf(
     # ) %>%
     # st_transform(4326)
 
-saveRDS(rc_fr_final, file = "hias_rothC_fr_final.rds")
-write_sf(rc_fr_final, dsn = "hias_rothC_fr_final.gpkg", driver = "GPKG", overwrite = TRUE) 
+saveRDS(rc_fr_final, file = "ep_rothC_fr_final.rds")
+write_sf(rc_fr_final, dsn = "ep_rothC_fr_final.gpkg", driver = "GPKG", overwrite = TRUE) 
 
 
 

@@ -7,7 +7,7 @@ library(soilassessment)
 library(mapview)
 
 # Set working directory
-setwd("D:\\geodata\\fin_project_data4\\fin_project_data4\\gsp-gsocseq_pe")
+setwd("D:\\geodata\\fin_project_data4\\fin_project_data5\\gsp-gsocseq_pe")
 
 # Vectorized NPPmodel
 source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
@@ -567,6 +567,8 @@ rc_fr_final <- st_as_sf(
 
 saveRDS(rc_fr_final, file = "ep_rothC_fr_final_pe.rds")
 write_sf(rc_fr_final, dsn = "ep_rothC_fr_final_pe.gpkg", driver = "GPKG", overwrite = TRUE) 
+
+# saveRDS(rc_fr_final, file = "rothC_fr_final_v2.rds")
 
 summary(rc_fr_final)
 
