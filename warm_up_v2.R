@@ -3,7 +3,6 @@
 library(SoilR)
 library(sf)
 library(raster)
-library(terra)
 library(rgdal)
 library(soilassessment)
 
@@ -11,15 +10,17 @@ library(soilassessment)
 source('C:/Users/stephen.roecker/OneDrive - USDA/projects/gsp-gsocseq/code/functions.R')
 
 
-setwd("D:/geodata/project_data/gsp-gsocseq/AK")
+setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 
 
 # Load inputs ----
 
 # warm up data
-wu_df <- readRDS("wu_df.rds")
-wu_df <- wu_df[order(wu_df$cell), ]
-# wu_df <- data.table::fread(file = "wu_pts_v2.csv")
+wu_df <- data.table::fread(file = "wu_pts.csv", data.table = FALSE)
+wu_df <- as.data.frame(wu_df)
+
+# wu_df <- readRDS("wu_df.rds")
+# wu_df <- wu_df[order(wu_df$cell), ]
 # wu_sf <- st_as_sf(
 #   wu_df,
 #   coords = c("x", "y"),
@@ -59,7 +60,7 @@ su_df$cell <- NULL
 # wu_df <- readRDS("wu_df.rds")
 wu_df <- cbind(su_df, wu_df)
 rm(su_df)
-names(wu_df)[725] <- "DR"
+names(wu_df)[726:727] <- c("LU", "DR")
 
 
 
@@ -138,7 +139,7 @@ C_max <- cbind(replicate(19, wu_df$Cin.max))
 # C_min <- apply(C_min, 2, function(x) ifelse(is.na(x), 0, x))
 # C_max <- apply(C_max, 2, function(x) ifelse(is.na(x), 0, x))
 
-C_rv[, 1]  <- C_rv[, 1]  / NPP_rv     * NPP_M[, 1]
+C_rv[, 1]  <- C_rv[, 1]  / NPP_rv  * NPP_M[, 1]
 C_min[, 1] <- C_min[, 1] / NPP_min * NPP_M_min[, 1]
 C_max[, 1] <- C_max[, 1] / NPP_max * NPP_M_max[, 1]
 
@@ -171,12 +172,15 @@ rm(C_rv, C_min, C_max)
 # Moisture effects per month ----
 xi <- lapply(1:10, function(x) {
   
-  fn <- paste0("wu_pts_sub_", x, "_v2.rds")
+  fn <- paste0("wu_pts_sub_", x, ".rds")
   
   cat("computing ", fn , as.character(Sys.time()), "\n")
   
   wu_df <- readRDS(file = fn)
-  pClay_r <- wu_df$pClay.r
+  
+  names(wu_df)[691:692] <- c("LU", "DR")
+  
+  pClay_r <- wu_df$CONUS_gnatsgo_fy20_1km_clay_wt
   TEMP <- wu_df[grepl("_tmmx$", names(wu_df))]
   PREC <- wu_df[grepl("_pr$", names(wu_df))]
   PET  <- wu_df[grepl("_pet$",  names(wu_df))]
@@ -269,11 +273,12 @@ data.table::fwrite(xi_max, "wu_effcts_max.csv")
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
 # Load Model Inputs ----
-aoi <- "AK1"
-nSim  <- nlyr(rast("AK1_Temp_Stack_228_01_19_TC.tif")) / 12
+
+aoi <- "CONUS"
+nSim  <- nlayers(stack(paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"))) / 12
 years <- seq(1 / 12, 1, by = 1 / 12)
 
-aoi <- "AK"
+aoi <- "CONUS"
 su_df <- readRDS("su_results_v3_analytical.rds")
 
 pClay_r   <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt
@@ -292,15 +297,39 @@ C_min <- readRDS("wu_C_min.rds")
 C_max <- readRDS("wu_C_max.rds")
 
 
+
+# set.seed(42)
+# su_df2 <- su_df;
+# idx <- sample(1:nrow(su_df), 20000)
+# su_df <- su_df2[idx, ]
+
+
+# xi_r2 <- xi_r; C_rv2 <- C_rv
+# xi_r  <- xi_r2[idx, ]
+# C_rv  <- C_rv2[idx, ]
+# 
+# xi_min2 <- xi_min; C_min2 <- C_min
+# xi_min <- xi_min2[idx, ]
+# C_min  <- C_min2[idx, ]
+# 
+# xi_max2 <- xi_max; C_max2 <- C_max
+# xi_max <- xi_max2[idx, ]
+# C_max  <- C_max2[idx, ]
+
+idx <- complete.cases(su_df)
+su_df <- su_df[idx, ]
+xi_r  <- xi_r[idx, ]
+C_rv  <- C_rv[idx, ]
+
+
 # Run RothC ----
 library(parallel)
 
 ## C input equilibrium. (Ceq) ----
 # su_df2 <- su_df[1:2000, ]; C_rv2 <- C_rv[1:2000, ]; xi_r2 <- xi_r[1:2000, ]
 
-clus <- makeCluster(12)
+clus <- makeCluster(4)
 clusterExport(clus, list("su_df", "C_rv", "xi_r", "years", "carbonTurnover", "rothC_wu"))
-
 
 Sys.time()
 rothC_r <- rothC_wu(
@@ -324,9 +353,14 @@ C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
 xi_r  <- as.data.frame(data.table::fread("wu_effcts_r.csv")[idx, ])
 # xi_r   <- readRDS("wu_effcts_r.rds")[idx, ]
 
+# su_df <- su_df2[idx, ]
+# C_rv  <- C_rv2[idx, ]
+# xi_r  <- xi_r2[idx, ]
+
+
 
 library(parallel)
-clus <- makeCluster(14)
+clus <- makeCluster(16)
 clusterExport(clus, list("idx", "su_df", "C_rv", "xi_r", "years", "RothCModel", "getC", "rothC_wu"))
 
 Sys.time()
@@ -343,7 +377,7 @@ stopCluster(clus)
 
 
 ## Cmin input equilibrium. (Ceq) ----
-clus <- makeCluster(12)
+clus <- makeCluster(16)
 clusterExport(clus, list("su_df", "C_min", "xi_min", "years", "carbonTurnover", "rothC_wu"))
 
 Sys.time()
@@ -367,8 +401,14 @@ C_min  <- readRDS("wu_C_min.rds")[idx, ]
 xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv")[idx, ])
 # xi_min <- readRDS("wu_effcts_min.rds")[idx, ]
 
+
+su_df <- su_df2[idx, ]
+C_rv  <- C_rv2[idx, ]
+xi_r  <- xi_r2[idx, ]
+
+
 library(parallel)
-clus <- makeCluster(14)
+clus <- makeCluster(16)
 clusterExport(clus, list("idx", "su_df", "C_min", "xi_min", "years", "RothCModel", "getC", "rothC_wu_nn"))
 
 Sys.time()
@@ -385,7 +425,7 @@ stopCluster(clus)
 
 
 ## Cmax input equilibrium. (Ceq) ----
-clus <- makeCluster(12)
+clus <- makeCluster(16)
 clusterExport(clus, list("su_df", "C_max", "xi_max", "years", "carbonTurnover", "rothC_wu"))
 
 Sys.time()
@@ -410,8 +450,14 @@ xi_max <- as.data.frame(data.table::fread("wu_effcts_max.csv")[idx, ])
 xi_max <- readRDS("wu_effcts_max.rds")[idx, ]
 
 
+su_df  <- su_df2[idx, ]
+C_max  <- C_max2[idx, ]
+xi_max <- xi_max2[idx, ]
+
+
+
 library(parallel)
-clus <- makeCluster(14)
+clus <- makeCluster(16)
 clusterExport(clus, list("idx", "su_df", "C_max", "xi_max", "years", "RothCModel", "getC", "rothC_wu_nn"))
 
 Sys.time()
@@ -437,11 +483,14 @@ rc_wu_min_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu_non
 rc_wu_max     <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds")))
 rc_wu_max_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu_nonneg.rds")))
 
-C_rv  <- readRDS("wu_C_rv.rds")
-C_min <- readRDS("wu_C_min.rds")
-C_max <- readRDS("wu_C_max.rds")
-
 su_df <- as.data.frame(readRDS(file = "su_results_v3_analytical.rds"))
+idx <- sample(1:nrow(su_df), 20000)
+su_df <- su_df[idx, ]
+
+C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
+C_min <- readRDS("wu_C_min.rds")[idx, ]
+C_max <- readRDS("wu_C_max.rds")[idx, ]
+
 
 
 # replace
@@ -461,7 +510,7 @@ sum(apply(rc_wu_r, 1, function(x) any(x < 0)), na.rm = TRUE)
 
 
 # combine
-vars <- c("cell", "X", "Y", "SOC.r", "Cin.r")
+vars <- c("cell", "x", "y", "SOC.r", "Cin.r")
 
 rc_wu_all <- rbind(
   cbind(source = "r",   cell = su_df$cell, Cinput = C_rv[19],  CinputFORWARD = rowMeans(C_rv),  rc_wu_r),
