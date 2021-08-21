@@ -181,9 +181,9 @@ clay_ak <- resample(
 
 
 # TerraClimate ----
-setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
+setwd("D:/geodata/project_data/gsp-gsocseq/AK")
 
-aoi <- "CONUS"
+aoi <- "AK2"
 
 ## Resample original data to GSOC extent ----
 gsoc2 <- rast(paste0(aoi, "_GSOCmap1.5.0.tif"))
@@ -288,7 +288,7 @@ gdalUtilities::gdalwarp(
 
 
 ## load data ----
-aoi <- "CONUS"
+aoi <- "AK1"
 tmp8100 <- rast(paste0(aoi, "_Temp_Stack_228_81_00_TC.tif"))
 tmp0119 <- rast(paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"))
 ppt8100 <- rast(paste0(aoi, "_Prec_Stack_228_81_00_TC.tif"))
@@ -583,8 +583,8 @@ writeRaster(dr, file = paste0(aoi, "_glc_shv10_DOM_DR.tif"), overwrite = TRUE)
 
 # Stack layers ----
 
-aoi <- "CONUS"
-setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
+aoi <- "AK2"
+setwd("D:/geodata/project_data/gsp-gsocseq/AK")
 
 ## Spin up layers ----
 vars <- c(SOC  = paste0(aoi, "_GSOCmap1.5.0.tif"),
@@ -617,8 +617,12 @@ su_sf <- st_as_sf(
   coords = c("x", "y"),
   crs    = 4326
 )
+saveRDS(su_df, file = paste0(aoi, "_su_df.RDS"))
 saveRDS(su_sf, file = paste0(aoi, "_su_sf.RDS"))
 
+# set.seed(41)
+# su_sf_sub <- su_sf[sample(1:nrow(su_sf), 100000), ]
+# saveRDS(su_sf_sub, file = paste0(aoi, "_su_sf.RDS"))
 
 
 ## Warm up layers ----
@@ -644,6 +648,7 @@ wu_rs  <- rast(vars)
 
 
 ### partition points (if too large) ----
+su_sf$id <- 1:nrow(su_sf)
 su_sf$idx <- as.integer(
   cut(su_sf$id, 
       breaks = quantile(su_sf$id, p = seq(0, 1, 0.1)), 
@@ -651,22 +656,30 @@ su_sf$idx <- as.integer(
 )
 
 test <- lapply(1:10, function(x) {
+  
   cat("extracting part", x, as.character(Sys.time()), "\n")
-  temp  <- vect(su_pts[which(su_pts$idx == x), ])
+  
+  su_sf_sub <- su_sf[which(su_sf$idx == x), ]
+  temp      <- vect(su_sf_sub)
   # temp  <- su_pts[1:100, ]
-  wu_ex <- extract(wu_rs, temp, xy = TRUE)
+  wu_ex     <- extract(wu_rs, temp, xy = TRUE, cells = TRUE)
   # wu_ex <- as.data.frame(extract(wu_rs, temp, sp = TRUE))
-  wu_ex <- cbind(idx = x, wu_ex)
-  saveRDS(wu_ex, file = paste0("wu_pts_sub_", x, "_v2.rds"))
+  wu_ex <- cbind(id      = su_sf_sub$id,
+                 idx     = x, 
+                 su_cell = su_sf_sub$cell, 
+                 wu_ex
+                 )
+  saveRDS(wu_ex, file = paste0("wu_pts_sub_", x, ".rds"))
 })
 
-f_p <- paste0("wu_pts_sub_", 1:10, "_v2.rds")
+f_p <- paste0("wu_pts_sub_", 1:10, ".rds")
 
-wu_pts_p1 <- lapply(f_p[1], function(x){
+wu_pts_p1 <- lapply(f_p[1:5], function(x){
   temp <- readRDS(file = x)
 })
 wu_pts_p1 <- data.table::rbindlist(wu_pts_p1)
 data.table::fwrite(wu_pts_p1, file = "wu_pts_p1.csv")
+
 
 wu_pts_p2 <- lapply(f_p[6:10], function(x) {
   temp <- readRDS(file = x)
@@ -674,10 +687,12 @@ wu_pts_p2 <- lapply(f_p[6:10], function(x) {
 wu_pts_p2 <- data.table::rbindlist(wu_pts_p2)
 data.table::fwrite(wu_pts_p2, file = "wu_pts_p2.csv")
 
+
 wu_pts_p1 <- data.table::fread(file = "wu_pts_p1.csv")
 wu_pts_p2 <- data.table::fread(file = "wu_pts_p2.csv")
 wu_pts <- rbind(wu_pts_p1, wu_pts_p2)
-data.table::fwrite(wu_pts, file = "wu_pts_v2.csv")
+data.table::fwrite(wu_pts, file = "wu_pts.csv")
+
 
 
 ### don't partition points (if # of points is small) ----
@@ -762,8 +777,8 @@ saveRDS(fr_df, file = paste0(aoi, "_fr_df.RDS"))
 
 
 ## AK ----
-su_ak1 <- readRDS("AK1_su_sf.RDS")
-su_ak2 <- readRDS("AK2_su_sf.RDS")
+su_ak1 <- readRDS("AK1_su_df.RDS")
+su_ak2 <- readRDS("AK2_su_df.RDS")
 wu_ak1 <- readRDS("AK1_wu_df.rds")
 wu_ak2 <- readRDS("AK2_wu_df.rds")
 fr_ak1 <- readRDS("AK1_fr_df.rds")
@@ -773,8 +788,7 @@ su_ak <- rbind(
     cbind(aoi = "AK1", su_ak1),
     cbind(aoi = "AK2", su_ak2)
   )
-su_ak <- cbind(sf::st_coordinates(su_ak), su_ak)
-saveRDS(su_ak, file = "su_sf.RDS")
+saveRDS(su_ak, file = "su_df.RDS")
 
 wu_ak <- rbind(
     cbind(aoi = "AK1", wu_ak1),
