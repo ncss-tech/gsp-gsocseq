@@ -28,8 +28,7 @@ setwd("D:/geodata/project_data/gsp-gsocseq/AK")
 # Load inputs ----
 
 # Stack_Set_1 is a stack that contains the spatial variables 
-su_sf <- readRDS(file = "su_sf.RDS")
-su_df  <- as.data.frame(su_sf)
+su_df <- readRDS(file = "su_df.RDS")
 
 
 # Extract the layers from the Vector
@@ -166,7 +165,7 @@ saveRDS(xi_max, "su_effcts_max.rds")
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
-su_df <- as.data.frame(readRDS(file = "su_sf.RDS"))
+su_df <- readRDS(file = "su_df.RDS")
 
 years <- seq(1 / 12, 500, by = 1 / 12)
 
@@ -340,7 +339,7 @@ stopCluster(clus)
 
 # Outputs ----
 rothC_r <- as.data.frame(
-  cbind(su_df[c("aoi", "cell", "X", "Y", "LU", "DR")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r,
+  cbind(su_df[c("aoi", "cell", "x", "y", "LU", "DR")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r,
         source = "r",
   do.call(
     "rbind", 
@@ -348,7 +347,7 @@ rothC_r <- as.data.frame(
     )))
 
 rothC_min <- as.data.frame(
-  cbind(su_df[c("aoi", "cell", "X", "Y", "LU", "DR")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, 
+  cbind(su_df[c("aoi", "cell", "x", "y", "LU", "DR")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, 
         source = "min",
   do.call(
     "rbind", 
@@ -356,7 +355,7 @@ rothC_min <- as.data.frame(
   )))
 
 rothC_max <- as.data.frame(
-  cbind(su_df[c("aoi", "cell", "X", "Y", "LU", "DR")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, 
+  cbind(su_df[c("aoi", "cell", "x", "y", "LU", "DR")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, 
         source = "max",
   do.call(
     "rbind", 
@@ -430,7 +429,7 @@ library(data.table)
 
 rothC_dfw2 <- dcast(
   as.data.table(rothC_df), 
-  cell + X + Y + aoi + LU + DR ~ source, 
+  cell + x + y + aoi + LU + DR ~ source, 
   value.var = c("SOC", "FallIOM", "pClay", "fract.dpm", "fract.rpm", "fract.bio", "fract.hum", "fract.iom", "Cin", "fract.sum"),
   sep = "."
   )
