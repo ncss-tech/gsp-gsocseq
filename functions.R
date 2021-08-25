@@ -22,6 +22,29 @@ avgRS <- function(rs, var, interval) {
 }
 
 
+# function to sum layers
+sumRS <- function(rs, var, interval) {
+  
+  idx_r  <- class(rs) == "RasterStack"
+  int_nm <- names(interval)
+  
+  rs_l <- lapply(interval, function(x) {
+    vars <- paste0(x, "_", var)
+    idx  <- which(names(rs) %in% vars)
+    cat("summing", paste(names(rs[[idx]]), collapse = ", "), "\n", "\n")
+    sum(rs[[idx]], na.rm = TRUE)
+  })
+  
+  if (idx_r) {
+    final_rs <- stack(rs_l)
+  } else final_rs <- rast(rs_l)
+  
+  if (!is.null(int_nm)) names(final_rs) <- int_nm
+  
+  return(final_rs)
+}
+
+
 # function to average years
 avgRSyr <- function(rs, var, yrs) { 
   
