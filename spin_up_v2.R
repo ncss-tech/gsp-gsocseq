@@ -22,13 +22,19 @@ source('C:/Users/stephen.roecker/OneDrive - USDA/projects/gsp-gsocseq/code/funct
 
 
 # set to aoi
-setwd("D:/geodata/project_data/gsp-gsocseq/AK")
+setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 
 
 # Load inputs ----
 
 # Stack_Set_1 is a stack that contains the spatial variables 
 su_df <- readRDS(file = "su_df.RDS")
+vv <- readRDS("vv.rds")
+
+su_df$idx <- paste(su_df$x, su_df$y)
+vv$idx <- paste(vv$x, vv$y)
+
+su_df <- su_df[su_df$idx %in% vv$idx, ]
 
 
 # Extract the layers from the Vector
@@ -70,46 +76,6 @@ fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) {
 
     
 # Moisture effects per month ----
-fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
-  
-  M     <- PREC - PET * pE
-  bare  <- as.data.frame(lapply(COV, function(x) x > 0.8))
-  
-  B <- as.data.frame(lapply(bare, function(x) ifelse(x == FALSE, 1, 1.8)))
-  Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23)
-  Max.TSMD <- as.data.frame(lapply(1 / B, function(x) x * Max.TSMD))
-  
-  Acc.TSMD <- M
-  Acc.TSMD[, 1] <- ifelse(M[, 1] > 0, 0, M[, 1])
-  
-  for (i in 2:ncol(M)) {
-    Acc.TSMD_i <- Acc.TSMD[, i - 1] + M[, i]
-    Acc.TSMD[, i] <- ifelse(
-      Acc.TSMD_i < 0,
-      Acc.TSMD_i,
-      0
-      )
-    Acc.TSMD[, i] <- ifelse(
-      Acc.TSMD[, i] <= Max.TSMD[, i],
-      Max.TSMD[, i],
-      Acc.TSMD[, i]
-      )
-  }
-   
-  fW <- Acc.TSMD
-    
-  for (i in 1:ncol(fW)) {
-    fW[, i] <- ifelse(
-      Acc.TSMD[, i] > 0.444 * Max.TSMD[, i], 
-      1, 
-      (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i]) / (Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
-      )
-    fW[, i] <- raster::clamp(fW[, i], lower = 0.2)
-    }
-    
-  return(fW)
-  }
-
 fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
 fW_min <- fW(pClay_r * 0.9, PREC * 0.95, PET, COV, s_thk = 30, pE = 1)
 fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
@@ -201,8 +167,8 @@ xi_max2 <- rowMeans(xi_max)
 
 library(parallel)
 
-clus <- makeCluster(15)
-
+# clus <- makeCluster(15)
+# 
 # C input equilibrium. (Ceq) ----
 # clusterExport(clus, list("DR", "pClay_r", "ri_r", "FallIOM_r", "years", "carbonTurnover")) # , "rothC"))
 # 
