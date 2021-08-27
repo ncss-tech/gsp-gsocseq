@@ -188,44 +188,51 @@ aoi <- "CONUS"
 ## Resample original data to GSOC extent ----
 gsoc2 <- rast(paste0(aoi, "_GSOCmap1.5.0.tif"))
 
+lf <- list.files()
+idx <- grepl("_Stack_228_....._TC.tif", lf)
+# file.remove(lf[idx])
 
 # tmp8100
 gdalUtilities::gdalwarp(
   srcfile = paste0(aoi, "_AverageTemperature_1981-2001.tif"),
-  dstfile = paste0(aoi, "_Temp_Stack_228_81_00_TC.tif"),
+  dstfile = paste0(aoi, "_Temp_Stack_228_81-00_TC.tif"),
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
+  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
 # tmp0120
 gdalUtilities::gdalwarp(
   srcfile = paste0(aoi, "_AverageTemperature_2001-2021.tif"),
-  dstfile = paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"),
+  dstfile = paste0(aoi, "_Temp_Stack_228_01-19_TC.tif"),
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
+  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
 # ppt8100
 gdalUtilities::gdalwarp(
   srcfile = paste0(aoi, "_Precipitation_1981-2001.tif"),
-  dstfile = paste0(aoi, "_Prec_Stack_228_81_00_TC.tif"),
+  dstfile = paste0(aoi, "_Prec_Stack_228_81-00_TC.tif"),
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
+  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
 # ppt0120
 gdalUtilities::gdalwarp(
   srcfile = paste0(aoi, "_Precipitation_2001-2021.tif"),
-  dstfile = paste0(aoi, "_Prec_Stack_228_01_19_TC.tif"),
+  dstfile = paste0(aoi, "_Prec_Stack_228_01-19_TC.tif"),
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
+  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -236,6 +243,7 @@ gdalUtilities::gdalwarp(
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
+  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -246,6 +254,7 @@ gdalUtilities::gdalwarp(
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
+  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -285,14 +294,42 @@ gdalUtilities::gdalwarp(
 #   # )
 # })
 
-
-
-## load data ----
+##  convert variables ----
 aoi <- "CONUS"
-tmp8100 <- rast(paste0(aoi, "_Temp_Stack_228_81_00_TC.tif"))
-tmp0119 <- rast(paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"))
-ppt8100 <- rast(paste0(aoi, "_Prec_Stack_228_81_00_TC.tif"))
-ppt0119 <- rast(paste0(aoi, "_Prec_Stack_228_01_19_TC.tif"))
+tmp8100 <- rast(paste0(aoi, "_Temp_Stack_228_81-00_TC.tif"))
+tmp0119 <- rast(paste0(aoi, "_Temp_Stack_228_01-19_TC.tif"))
+pet8100 <- rast(paste0(aoi, "_PET_Stack_228_81-00_TC.tif"))
+pet0119 <- rast(paste0(aoi, "_PET_Stack_228_01-19_TC.tif"))
+
+tmp8100 <- tmp8100 * 0.1
+tmp0119 <- tmp0119 * 0.1
+pet8100 <- pet8100 * 0.1
+pet0119 <- pet0119 * 0.1
+
+writeRaster(
+  tmp8100, datatype = "INT2S",  # gdal = c("COMPRESS=DEFLATE"),
+  filename = paste0(aoi, "_Temp_Stack_228_81-00_TC.tif"), overwrite = TRUE
+)
+writeRaster(
+  tmp0119, datatype = "INT2S",  # gdal = c("COMPRESS=DEFLATE"),
+  filename = paste0(aoi, "_Temp_Stack_228_01-19_TC.tif"), overwrite = TRUE
+)
+writeRaster(
+  pet8100, datatype = "INT2S",  # gdal = c("COMPRESS=DEFLATE"),
+  filename = paste0(aoi, "_PET_Stack_228_81-00_TC.tif"), overwrite = TRUE
+)
+writeRaster(
+  pet0119, datatype = "INT2S",  # gdal = c("COMPRESS=DEFLATE"),
+  filename = paste0(aoi, "_PET_Stack_228_01-19_TC.tif"), overwrite = TRUE
+)
+
+
+## load converted data ----
+aoi <- "CONUS"
+tmp8100 <- rast(paste0(aoi, "_Temp_Stack_228_81-00_TC.tif"))
+tmp0119 <- rast(paste0(aoi, "_Temp_Stack_228_01-19_TC.tif"))
+ppt8100 <- rast(paste0(aoi, "_Prec_Stack_228_81-00_TC.tif"))
+ppt0119 <- rast(paste0(aoi, "_Prec_Stack_228_01-19_TC.tif"))
 pet8100 <- rast(paste0(aoi, "_PET_Stack_228_81-00_TC.tif"))
 pet0119 <- rast(paste0(aoi, "_PET_Stack_228_01-19_TC.tif"))
 
@@ -307,14 +344,14 @@ mos0119 <- lapply(mos, function(x) paste0(2001:2019, x))
 
 
 ## average months ----
-tmp8100_avg <- avgRS(tmp8100, "tmmx", mos8100) * 0.1
-tmp0119_avg <- avgRS(tmp0119, "tmmx", mos0119) * 0.1
+tmp8100_avg <- avgRS(tmp8100, "tmmx", mos8100)
+tmp0119_avg <- avgRS(tmp0119, "tmmx", mos0119)
 
 ppt8100_avg <- avgRS(ppt8100, "pr", mos8100)
 ppt0119_avg <- avgRS(ppt0119, "pr", mos0119)
 
-pet8100_avg <- avgRS(pet8100, "pet", mos8100) * 0.1
-pet0119_avg <- avgRS(pet0119, "pet", mos0119) * 0.1
+pet8100_avg <- avgRS(pet8100, "pet", mos8100)
+pet0119_avg <- avgRS(pet0119, "pet", mos0119)
 
 
 
@@ -363,23 +400,13 @@ yrs0119 <- lapply(2001:2019, function(x) paste0(x))
 yrs0119 <- lapply(yrs0119, function(x) paste0(x, formatC(1:12, width = 2, flag = "0")))
 
 
-tmp8100_avg_yr <- avgRS(tmp8100, "tmmx", yrs8100) * 0.1
-tmp0119_avg_yr <- avgRS(tmp0119, "tmmx", yrs0119) * 0.1
+tmp8100_avg_yr <- avgRS(tmp8100, "tmmx", yrs8100)
+tmp0119_avg_yr <- avgRS(tmp0119, "tmmx", yrs0119)
 ppt8100_sum_yr <- sumRS(ppt8100, "pr",   yrs8100)
 ppt0119_sum_yr <- sumRS(ppt0119, "pr",   yrs0119)
-pet8100_avg_yr <- avgRS(pet8100, "pet",  yrs8100) * 0.1
-pet0119_avg_yr <- avgRS(pet0119, "pet",  yrs0119) * 0.1
+pet8100_avg_yr <- avgRS(pet8100, "pet",  yrs8100)
+pet0119_avg_yr <- avgRS(pet0119, "pet",  yrs0119)
 
-
-# # resample to GSOC extent
-# tmp8100_avg_yr <- resample(readAll(tmp8100_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
-# tmp0121_avg_yr <- resample(readAll(tmp0121_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
-# 
-# ppt8100_avg_yr <- resample(readAll(ppt8100_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
-# ppt0121_avg_yr <- resample(readAll(ppt0121_avg_yr), gsoc2, method = "bilinear", progress = "text", datatype = "INT2S")
-# 
-# pet8100_avg_yr <- resample(readAll(pet8100_avg_yr), gsoc2, method = "bilinear", progress = "text")
-# pet0120_avg_yr <- resample(readAll(pet0120_avg_yr), gsoc2, method = "bilinear", progress = "text")
 
 
 # cache averages by year
@@ -434,6 +461,7 @@ npp8100 <- rast(npp8100)
 npp8100_TnCHaYr <- npp8100 * 1/100 * 0.5
 writeRaster(npp8100_TnCHaYr, filename = paste0(aoi, "_NPP_MIAMI_tnC_Ha_Year_STACK_81-00.tif"), overwrite = TRUE, gdal = c("COMPRESS=DEFLATE"))
 
+
 npp8100_TnCHaYr_avg <- mean(npp8100_TnCHaYr) 
 names(npp8100_TnCHaYr_avg) <- "NPP_MIAMI_MEAN_81-00_AOI"
 writeRaster(npp8100_TnCHaYr_avg, filename = paste0(aoi, "_NPP_MIAMI_MEAN_81-00_AOI.tif"), overwrite = TRUE, gdal = c("COMPRESS=DEFLATE"))
@@ -443,15 +471,6 @@ writeRaster(npp8100_TnCHaYr_avg, filename = paste0(aoi, "_NPP_MIAMI_MEAN_81-00_A
 # Uncertainties ----
 
 ## Min ----
-# tmp8100 <- rast(paste0(aoi, "_Temp_Stack_228_81_00_TC.tif"))
-# ppt8100 <- rast(paste0(aoi, "_Prec_Stack_228_81_00_TC.tif"))
-# 
-# tmp8100_min <- tmp8100 * 1.02
-# ppt8100_min <- ppt8100 * 0.95
-# 
-# tmp8100_min_avg <- avgRS(tmp8100_min, "tmmx", yrs8100) * 0.1
-# ppt8100_min_avg <- avgRS(ppt8100_min, "pr", yrs8100)
-
 tmp8100_avg_yr <- rast(paste0(aoi, "_Temp_Stack_81-00_TC_yr.tif"))
 ppt8100_sum_yr <- rast(paste0(aoi, "_Prec_Stack_81-00_TC_yr.tif"))
 
@@ -483,16 +502,8 @@ writeRaster(npp8100_min_TnCHaYr_avg,
 )
 
 
-## Max ----
-# tmp0119 <- rast(paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"))
-# ppt0119 <- rast(paste0(aoi, "_Prec_Stack_228_01_19_TC.tif"))
-# 
-# tmp8100_max <- tmp8100 * 0.98
-# ppt8100_max <- ppt8100 * 1.05
-# 
-# tmp8100_max_avg <- avgRS(tmp8100_max, "tmmx", yrs8100) * 0.1
-# ppt8100_max_avg <- avgRS(ppt8100_max, "pr",   yrs8100)
 
+## Max ----
 tmp8100_avg_yr <- rast(paste0(aoi, "_Temp_Stack_81-00_TC_yr.tif"))
 ppt8100_sum_yr <- rast(paste0(aoi, "_Prec_Stack_81-00_TC_yr.tif"))
 
@@ -509,7 +520,6 @@ npp8100_max <- lapply(1:20, function(i) {
 npp8100_max         <- rast(npp8100_max)
 npp8100_max_TnCHaYr <- npp8100_max * 1/100 * 0.5
 
-# npp8100_max_TnCHaYr <- resample(readAll(npp8100_max_TnCHaYr), gsoc2, method = "bilinear", progress = "text")
 
 writeRaster(npp8100_max_TnCHaYr, 
             filename = paste0(aoi, "_NPP_MIAMI_tnC_Ha_Year_STACK_81-00_MAX.tif"), 
@@ -519,6 +529,7 @@ writeRaster(npp8100_max_TnCHaYr,
 
 npp8100_max_TnCHaYr_avg <- mean(npp8100_max_TnCHaYr) 
 names(npp8100_max_TnCHaYr_avg) <- "NPP_MIAMI_MEAN_81-00_AOI_MAX"
+
 writeRaster(npp8100_max_TnCHaYr_avg, 
             filename = paste0(aoi, "_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"), 
             overwrite = TRUE, 
@@ -619,9 +630,8 @@ su_sf <- st_as_sf(
   crs    = 4326
 )
 
-idx <- sample(1:nrow(su_df), 20000)
-saveRDS(su_df[idx, ], file = paste0(aoi, "_su_df.RDS"))
-saveRDS(su_sf[idx, ], file = paste0(aoi, "_su_sf.RDS"))
+saveRDS(su_df, file = paste0(aoi, "_su_df.RDS"))
+saveRDS(su_sf, file = paste0(aoi, "_su_sf.RDS"))
 
 
 test <- st_make_grid(su_sf)
@@ -631,7 +641,13 @@ saveRDS(test, "tile_crop.rds")
 # writeRaster(su_sub, filename = "Stack_Set_SPIN_UP_AOI.tif", filetype = "GTiff", overwrite = TRUE)
 
 
-# set.seed(41)
+set.seed(42)
+idx <- sample(1:nrow(su_df), 20000)
+saveRDS(su_df[idx, ], file = "su_df.RDS")
+saveRDS(su_sf[idx, ], file = "su_sf.RDS")
+
+
+# set.seed(42)
 # su_sf_sub <- su_sf[sample(1:nrow(su_sf), 100000), ]
 # saveRDS(su_sf_sub, file = paste0(aoi, "_su_sf.RDS"))
 
@@ -646,8 +662,8 @@ vars <- c(SOC  = paste0(aoi, "_GSOCmap1.5.0.tif"),
           COV  = paste0(aoi, "_Cov_stack_AOI.tif"),
           LU   = paste0(aoi, "_glc_shv10_DOM.tif"),
           DR   = paste0(aoi, "_glc_shv10_DOM_DR.tif"),
-          TEMP = paste0(aoi, "_Temp_Stack_228_01_19_TC.tif"),
-          PREC = paste0(aoi, "_Prec_Stack_228_01_19_TC.tif"),
+          TEMP = paste0(aoi, "_Temp_Stack_228_01-19_TC.tif"),
+          PREC = paste0(aoi, "_Prec_Stack_228_01-19_TC.tif"),
           PET  = paste0(aoi, "_PET_Stack_228_01-19_TC.tif"),
           NPP  = paste0(aoi, "_NPP_MIAMI_MEAN_81-00_AOI.tif"),
           NPP_MIN = paste0(aoi, "_NPP_MIAMI_MEAN_81-00_AOI_MIN.tif"),
@@ -655,7 +671,6 @@ vars <- c(SOC  = paste0(aoi, "_GSOCmap1.5.0.tif"),
 )
 # LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
 wu_rs  <- rast(vars)
-# wu_rs  <- stack(vars)
 
 wu_sub <- crop(wu_rs[[1:16]], vect(test))
 # writeRaster(wu_sub[[1:16]], filename = "Stack_Set_WARM_UP_AOI.tif", filetype = "GTiff", overwrite = TRUE)
