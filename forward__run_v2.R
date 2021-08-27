@@ -8,7 +8,7 @@ library(sf)
 
 source('C:/Users/stephen.roecker/OneDrive - USDA/projects/gsp-gsocseq/code/functions.R')
 
-setwd("D:/geodata/project_data/gsp-gsocseq/AK")
+setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 
 
 # Load inputs ----
@@ -19,10 +19,10 @@ fr_df <- fr_df[order(fr_df$cell), ]
 
 # warm up
 wu_df <- readRDS(file = "rothC_r_wu_final.rds")
-wu_df[names(wu_df) == "cell"] <- NULL
+
 
 # combine
-fr_df <- cbind(fr_df, wu_df)
+fr_df <- merge(fr_df, wu_df, by = "cell", all.y = TRUE)
 fr_df <-fr_df[complete.cases(fr_df), ]
 
 
@@ -54,7 +54,7 @@ fr_df <- within(fr_df, {
   CinputFORWARD_med     <- ifelse(LU %in% lu_cl, CinputFORWARD.r   * 1.10,        CinputFORWARD.r)
   CinputFORWARD_high    <- ifelse(LU %in% lu_cl, CinputFORWARD.r   * 1.20,        CinputFORWARD.r)
   
-  CinputFORWARD_med_min <- ifelse(LU %in% lu_cl, CinputFORWARD.min * 1.05 - 0.15, CinputFORWARD.min) 
+  CinputFORWARD_med_min <- ifelse(LU %in% lu_cl, CinputFORWARD.min * 1.05 - 0.15, CinputFORWARD.min)
   CinputFORWARD_med_max <- ifelse(LU %in% lu_cl, CinputFORWARD.max * 1.20 + 0.15, CinputFORWARD.max)
 })
 
@@ -124,7 +124,7 @@ saveRDS(xi_max, "fr_effcts_max.rds")
 
 
 # RUN THE MODEL from soilassessment ----
-# load inputs
+##  load inputs ----
 years <- seq(1 / 12, 20, by = 1 / 12)
 
 fr_df <- readRDS("fr_df_Cinputs.rds")
@@ -379,10 +379,14 @@ rc_fr_all <- dcast(
 )
 rc_fr_all <- as.data.frame(rc_fr_all)
 
-vars <- c("aoi", "x", "y", "cell", "SOC", "CLAY", "LU", "SOC_t0.r", "SOC_t0.min", "SOC_t0.max", "CinputFORWARD.r", "CinputFORWARD.min", "CinputFORWARD.max")
+vars <- c("aoi", "x", "y", "cell", "SOC", "CLAY", "LU", "SOC_t0.r", 
+          "SOC_t0.min", "SOC_t0.max",
+          "CinputFORWARD.r", 
+          "CinputFORWARD.min", "CinputFORWARD.max"
+          )
 all(fr_df$cell == rc_fr_all$cell)
 rc_fr_all$cell <- NULL
-rc_fr_final <- cbind(fr_df[vars[-1]], rc_fr_all)
+rc_fr_final <- cbind(fr_df[vars], rc_fr_all)
 
 
 saveRDS(rc_fr_final, file = "rothC_fr_final.rds")
