@@ -19,48 +19,29 @@ setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 wu_df <- data.table::fread(file = "wu_pts.csv", data.table = FALSE)
 wu_df <- as.data.frame(wu_df)
 
-# wu_df <- readRDS("wu_df.rds")
-# wu_df <- wu_df[order(wu_df$cell), ]
-# wu_sf <- st_as_sf(
-#   wu_df,
-#   coords = c("x", "y"),
-#   crs    = 4326
-#   ) %>%
-#   st_transform(crs = 5070)
-# wu_df    <- cbind(round(st_coordinates(wu_sf)), st_drop_geometry(wu_sf))
-# wu_df    <- wu_df[complete.cases(wu_df), ]
-# wu_df$xy <- paste(wu_df$X, wu_df$Y, sep = "_")
-# rm(wu_sf)
-# 
-# idx <- 1:nrow(wu_df)
-# idx <- as.integer(cut(idx, breaks = quantile(idx, probs = seq(0, 1, 0.2)), include.lowest = TRUE))
-# wu_df <- wu_df[idx == 2, ]
+wu_df <- readRDS("wu_df.rds")
+wu_df <- wu_df[order(wu_df$cell), ]
 
 
 # Load spin up results
 aoi   <- "AK"
 su_df <- readRDS("su_results_v3_analytical.rds")
-su_df$cell <- NULL
-# su_df <- st_transform(su_df, crs = 5070)
-# su_df <- cbind(round(st_coordinates(su_df)), st_drop_geometry(su_df))
-# su_df$xy <- paste(su_df$X, su_df$Y, sep = "_")
-# saveRDS(su_df, "conus_su_results_v3.rds")
-# su_df <- readRDS("conus_su_results_v3.rds")
-# su_vars <- names(su_df)
 
 
-# combine
-# wu_df <- merge(wu_df, su_df, by = "xy", all.x = TRUE)
-# saveRDS(wu_df, "wu_df.rds")
-# 
-# vars <- c("X.y", "Y.y", "ID.y", "CONUS_gnatsgo_fy20_1km_clay_wt", "CONUS_glc_shv10_DOM_DR", su_vars[c(-1, -2, -3, -50)])
-# su_df <- wu_df[vars]
-# saveRDS(su_df, "su_df.rds")
+all(su_df$cell == wu_df$cell)
+wu_df <- cbind(su_df[-1], wu_df)
 # rm(su_df)
-# wu_df <- readRDS("wu_df.rds")
-wu_df <- cbind(su_df, wu_df)
-rm(su_df)
-names(wu_df)[726:727] <- c("LU", "DR")
+
+idx <- complete.cases(wu_df)
+sum(idx)
+wu_df <- wu_df[idx, ]
+su_df <- su_df[idx, ]
+
+vv <- readRDS("Vector_points.rds")
+
+wu_df <- wu_df[wu_df$cell %in% vv$cell, ]
+su_df <- su_df[su_df$cell %in% vv$cell, ]
+
 
 
 
@@ -135,10 +116,6 @@ C_rv  <- cbind(replicate(19, wu_df$Cin.r))
 C_min <- cbind(replicate(19, wu_df$Cin.min))
 C_max <- cbind(replicate(19, wu_df$Cin.max))
 
-# C_rv  <- apply(C_rv,  2, function(x) ifelse(is.na(x), 0, x))
-# C_min <- apply(C_min, 2, function(x) ifelse(is.na(x), 0, x))
-# C_max <- apply(C_max, 2, function(x) ifelse(is.na(x), 0, x))
-
 C_rv[, 1]  <- C_rv[, 1]  / NPP_rv  * NPP_M[, 1]
 C_min[, 1] <- C_min[, 1] / NPP_min * NPP_M_min[, 1]
 C_max[, 1] <- C_max[, 1] / NPP_max * NPP_M_max[, 1]
@@ -150,10 +127,10 @@ C_min[, idx] <- sapply(idx, function(i) C_min[, i - 1] / NPP_M_min[, i - 1] * NP
 C_max[, idx] <- sapply(idx, function(i) C_max[, i - 1] / NPP_M_max[, i - 1] * NPP_M_max[, i])
 
 
-idx <- 1:19
-C_rv[, idx]  <- sapply(idx, function(i) ifelse(is.na(C_rv[,  i]),  0,  C_rv[,  i]))
-C_min[, idx] <- sapply(idx, function(i) ifelse(is.na(C_min[,  i]), 0,  C_min[,  i]))
-C_max[, idx] <- sapply(idx, function(i) ifelse(is.na(C_max[,  i]), 0,  C_max[,  i]))
+# idx <- 1:19
+# C_rv[, idx]  <- sapply(idx, function(i) ifelse(is.na(C_rv[,  i]),  0,  C_rv[,  i]))
+# C_min[, idx] <- sapply(idx, function(i) ifelse(is.na(C_min[,  i]), 0,  C_min[,  i]))
+# C_max[, idx] <- sapply(idx, function(i) ifelse(is.na(C_max[,  i]), 0,  C_max[,  i]))
 
 
 saveRDS(C_rv,  "wu_C_rv.rds")
@@ -170,6 +147,7 @@ rm(C_rv, C_min, C_max)
 
 
 # Moisture effects per month ----
+# if file sizes are too large run the loop, otherwise run the lines inside the loop
 xi <- lapply(1:10, function(x) {
   
   fn <- paste0("wu_pts_sub_", x, ".rds")
@@ -177,8 +155,6 @@ xi <- lapply(1:10, function(x) {
   cat("computing ", fn , as.character(Sys.time()), "\n")
   
   wu_df <- readRDS(file = fn)
-  
-  names(wu_df)[691:692] <- c("LU", "DR")
   
   pClay_r <- wu_df$CONUS_gnatsgo_fy20_1km_clay_wt
   TEMP <- wu_df[grepl("_tmmx$", names(wu_df))]
@@ -188,24 +164,44 @@ xi <- lapply(1:10, function(x) {
   LU   <- wu_df$LU
   
   
-  fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
-  fW_min <- fW(pClay_r * 0.9, PREC * 0.95, PET, COV, s_thk = 30, pE = 1)
-  fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
+  # loop over each year separately
+  ncols  <- ncol(TEMP)
+  nyrs    <- ncols / 12 
+  df_idx <- data.frame(
+    yr = rep(1:nyrs, each = 12),
+    cn = 1:ncols
+    )
+  
+  fW_r <- TEMP
+  for (i in 1:nyrs) {
+    idx <- df_idx[df_idx$yr == i, ]$cn
+    fW_r[, idx]   <- fW(pClay_r      , PREC[, idx],        PET[, idx], COV, s_thk = 30, pE = 1)
+  }
+  
+  fW_min <- TEMP
+  for (i in 1:nyrs) {
+    idx <- df_idx[df_idx$yr == i, ]$cn
+    fW_min[, idx] <- fW(pClay_r * 0.9, PREC[, idx] * 0.95, PET[, idx], COV, s_thk = 30, pE = 1)
+  }
+  
+  fW_max <- TEMP
+  for (i in 1:nyrs) {
+    idx <- df_idx[df_idx$yr == i, ]$cn
+    fW_max[, idx] <- fW(pClay_r * 1.1, PREC[, idx] * 1.05, PET[, idx], COV, s_thk = 30, pE = 1)
+  }
+  
   
   
   # Temperature effects per month ----
   fT_r   <- as.data.frame(lapply(TEMP,        function(x) {
     temp <- fT.RothC(x)
-    temp <- ifelse(is.na(temp), 0, temp)
-  }))
+   }))
   fT_min <- as.data.frame(lapply(TEMP * 1.02, function(x) {
     temp <- fT.RothC(x)
-    temp <- ifelse(is.na(temp), 0, temp)
-  }))
+   }))
   fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) {
     temp <- fT.RothC(x)
-    temp <- ifelse(is.na(temp), 0, temp)
-  }))
+   }))
   
   
   # Vegetation Cover effects ----
@@ -281,16 +277,12 @@ years <- seq(1 / 12, 1, by = 1 / 12)
 aoi <- "CONUS"
 su_df <- readRDS("su_results_v3_analytical.rds")
 
-pClay_r   <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt
-pClay_min <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt * 0.9
-pClay_max <- su_df$CONUS_gnatsgo_fy20_1km_clay_wt * 1.1
-
-xi_r   <- as.data.frame(data.table::fread("wu_effcts_r.csv"))
-xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv"))
-xi_max <- as.data.frame(data.table::fread("wu_effcts_max.csv"))
-# xi_r   <- readRDS("wu_effcts_r.rds")
-# xi_min <- readRDS("wu_effcts_min.rds")
-# xi_max <- readRDS("wu_effcts_max.rds")
+# xi_r   <- as.data.frame(data.table::fread("wu_effcts_r.csv"))
+# xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv"))
+# xi_max <- as.data.frame(data.table::fread("wu_effcts_max.csv"))
+xi_r   <- readRDS("wu_effcts_r.rds")
+xi_min <- readRDS("wu_effcts_min.rds")
+xi_max <- readRDS("wu_effcts_max.rds")
 
 C_rv  <- readRDS("wu_C_rv.rds")
 C_min <- readRDS("wu_C_min.rds")
@@ -318,8 +310,6 @@ C_max <- readRDS("wu_C_max.rds")
 
 idx <- complete.cases(su_df)
 su_df <- su_df[idx, ]
-xi_r  <- xi_r[idx, ]
-C_rv  <- C_rv[idx, ]
 
 
 # Run RothC ----
@@ -328,7 +318,7 @@ library(parallel)
 ## C input equilibrium. (Ceq) ----
 # su_df2 <- su_df[1:2000, ]; C_rv2 <- C_rv[1:2000, ]; xi_r2 <- xi_r[1:2000, ]
 
-clus <- makeCluster(4)
+clus <- makeCluster(16)
 clusterExport(clus, list("su_df", "C_rv", "xi_r", "years", "carbonTurnover", "rothC_wu"))
 
 Sys.time()
@@ -348,27 +338,27 @@ stopCluster(clus)
 rc_wu <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu.rds")))
 idx <- which(apply(rc_wu, 1, function(x) any(x < 0)))
 
-su_df <- readRDS("su_results_v3_analytical.rds")[idx, ]
-C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
-xi_r  <- as.data.frame(data.table::fread("wu_effcts_r.csv")[idx, ])
+# su_df <- readRDS("su_results_v3_analytical.rds")[idx, ]
+# C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
+# xi_r  <- as.data.frame(data.table::fread("wu_effcts_r.csv")[idx, ])
 # xi_r   <- readRDS("wu_effcts_r.rds")[idx, ]
 
-# su_df <- su_df2[idx, ]
-# C_rv  <- C_rv2[idx, ]
-# xi_r  <- xi_r2[idx, ]
+su_df2 <- su_df[idx, ]
+C_rv2  <- C_rv[idx, ]
+xi_r2  <- xi_r[idx, ]
 
 
 
 library(parallel)
-clus <- makeCluster(16)
-clusterExport(clus, list("idx", "su_df", "C_rv", "xi_r", "years", "RothCModel", "getC", "rothC_wu"))
+clus <- makeCluster(15)
+clusterExport(clus, list("idx", "su_df2", "C_rv2", "xi_r2", "years", "RothCModel", "getC", "rothC_wu"))
 
 Sys.time()
 rothC_r_nn <- rothC_wu_nn(
   time  = years,
-  su_df = su_df, pClay_var = "pClay.r", C0_vars = c("fract.dpm.r", "fract.rpm.r", "fract.bio.r", "fract.hum.r", "fract.iom.r"), DR_var = "DR", 
-  C_m   = C_rv,
-  xi_df = xi_r
+  su_df = su_df2, pClay_var = "pClay.r", C0_vars = c("fract.dpm.r", "fract.rpm.r", "fract.bio.r", "fract.hum.r", "fract.iom.r"), DR_var = "DR", 
+  C_m   = C_rv2,
+  xi_df = xi_r2
 )
 Sys.time()
 # saveRDS(rothC_r_nn, file = "rothC_r_wu_nonneg.rds")
@@ -396,27 +386,26 @@ stopCluster(clus)
 rc_wu_min <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu.rds")))
 idx <- which(apply(rc_wu_min, 1, function(x) any(x < 0)))
 
-su_df  <- readRDS("su_results_v3_analytical.rds")[idx, ]
-C_min  <- readRDS("wu_C_min.rds")[idx, ]
-xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv")[idx, ])
+# C_min  <- readRDS("wu_C_min.rds")[idx, ]
+# xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv")[idx, ])
 # xi_min <- readRDS("wu_effcts_min.rds")[idx, ]
 
 
-su_df <- su_df2[idx, ]
-C_rv  <- C_rv2[idx, ]
-xi_r  <- xi_r2[idx, ]
+su_df2 <- su_df[idx, ]
+C_min2  <- C_min[idx, ]
+xi_min2  <- xi_min[idx, ]
 
 
 library(parallel)
 clus <- makeCluster(16)
-clusterExport(clus, list("idx", "su_df", "C_min", "xi_min", "years", "RothCModel", "getC", "rothC_wu_nn"))
+clusterExport(clus, list("idx", "su_df2", "C_min2", "xi_min2", "years", "RothCModel", "getC", "rothC_wu_nn"))
 
 Sys.time()
 rothC_min_nn <- rothC_wu_nn(
   time = years,
-  su_df = su_df, pClay_var = "pClay.min", C0_vars = c("fract.dpm.min", "fract.rpm.min", "fract.bio.min", "fract.hum.min", "fract.iom.min"), DR_var = "DR", 
-  C_m = C_min,
-  xi_df = xi_min
+  su_df = su_df2, pClay_var = "pClay.min", C0_vars = c("fract.dpm.min", "fract.rpm.min", "fract.bio.min", "fract.hum.min", "fract.iom.min"), DR_var = "DR", 
+  C_m = C_min2,
+  xi_df = xi_min2
 )
 Sys.time()
 # saveRDS(rothC_min_nn, file = "rothC_min_wu_nonneg.rds")
@@ -425,47 +414,66 @@ stopCluster(clus)
 
 
 ## Cmax input equilibrium. (Ceq) ----
-clus <- makeCluster(16)
-clusterExport(clus, list("su_df", "C_max", "xi_max", "years", "carbonTurnover", "rothC_wu"))
+
+rn <- as.integer(1:nrow(su_df))
+p  <- quantile(rn, probs = seq(0, 1, 0.1))
+idx <- as.integer(cut(rn, breaks = p, include.lowest = TRUE))
+df <- data.frame(rn = 1:length(rn), idx)
 
 Sys.time()
-rothC_max <- rothC_wu(
-  time = years,
-  su_df = su_df, pClay_var = "pClay.max", C0_vars = c("fract.dpm.max", "fract.rpm.max", "fract.bio.max", "fract.hum.max", "fract.iom.max"), DR_var = "DR", 
-  C_m = C_max,
-  xi_df = xi_max
-)
+lapply(1:10, function(i){
+  
+  # subset to fit into memory
+  idx <- df[df$idx == i, ]$rn
+  su_df2  <<- su_df[idx, ]
+  xi_max2 <<- xi_max[idx, ]
+  C_max2  <<- C_max[idx, ]
+  
+  clus <- makeCluster(16)
+  clusterExport(clus, list("su_df", "C_max", "xi_max", "years", "carbonTurnover", "rothC_wu"))
+  
+  Sys.time()
+  rothC_max <- rothC_wu(
+    time = years,
+    su_df = su_df, pClay_var = "pClay.max", C0_vars = c("fract.dpm.max", "fract.rpm.max", "fract.bio.max", "fract.hum.max", "fract.iom.max"), DR_var = "DR", 
+    C_m = C_max,
+    xi_df = xi_max
+  )
+  Sys.time()
+  saveRDS(rothC_max, file = paste0("rothC_max_wu_", i, ".rds"))
+  # saveRDS(rothC_max, file = "rothC_max_wu.rds")
+  stopCluster(clus)
+})
 Sys.time()
-# saveRDS(rothC_max, file = "rothC_max_wu.rds")
-stopCluster(clus)
+
+
 
 
 ### rerun on negative values using a different solver ----
 rc_wu_max <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds")))
 idx <- which(apply(rc_wu_max, 1, function(x) any(x < 0)))
 
-su_df  <- readRDS("su_results_v3_analytical.rds")[idx, ]
-C_max  <- readRDS("wu_C_max.rds")[idx, ]
-xi_max <- as.data.frame(data.table::fread("wu_effcts_max.csv")[idx, ])
-xi_max <- readRDS("wu_effcts_max.rds")[idx, ]
+# su_df  <- readRDS("su_results_v3_analytical.rds")[idx, ]
+# C_max  <- readRDS("wu_C_max.rds")[idx, ]
+# xi_max <- as.data.frame(data.table::fread("wu_effcts_max.csv")[idx, ])
+# xi_max <- readRDS("wu_effcts_max.rds")[idx, ]
 
-
-su_df  <- su_df2[idx, ]
-C_max  <- C_max2[idx, ]
-xi_max <- xi_max2[idx, ]
+su_df2  <- su_df[idx, ]
+C_max2  <- C_max[idx, ]
+xi_max2 <- xi_max[idx, ]
 
 
 
 library(parallel)
 clus <- makeCluster(16)
-clusterExport(clus, list("idx", "su_df", "C_max", "xi_max", "years", "RothCModel", "getC", "rothC_wu_nn"))
+clusterExport(clus, list("idx", "su_df2", "C_max2", "xi_max2", "years", "RothCModel", "getC", "rothC_wu_nn"))
 
 Sys.time()
 rothC_max_nn <- rothC_wu_nn(
   time = years,
-  su_df = su_df, pClay_var = "pClay.max", C0_vars = c("fract.dpm.max", "fract.rpm.max", "fract.bio.max", "fract.hum.max", "fract.iom.max"), DR_var = "DR", 
-  C_m = C_max,
-  xi_df = xi_max
+  su_df = su_df2, pClay_var = "pClay.max", C0_vars = c("fract.dpm.max", "fract.rpm.max", "fract.bio.max", "fract.hum.max", "fract.iom.max"), DR_var = "DR", 
+  C_m = C_max2,
+  xi_df = xi_max2
 )
 Sys.time()
 # saveRDS(rothC_max_nn, file = "rothC_max_wu_nonneg.rds")
@@ -484,12 +492,12 @@ rc_wu_max     <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds
 rc_wu_max_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu_nonneg.rds")))
 
 su_df <- as.data.frame(readRDS(file = "su_results_v3_analytical.rds"))
-idx <- sample(1:nrow(su_df), 20000)
+idx <- complete.cases(su_df)
 su_df <- su_df[idx, ]
 
-C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
-C_min <- readRDS("wu_C_min.rds")[idx, ]
-C_max <- readRDS("wu_C_max.rds")[idx, ]
+C_rv  <- readRDS("wu_C_rv.rds")
+C_min <- readRDS("wu_C_min.rds")
+C_max <- readRDS("wu_C_max.rds")
 
 
 
@@ -513,9 +521,9 @@ sum(apply(rc_wu_r, 1, function(x) any(x < 0)), na.rm = TRUE)
 vars <- c("cell", "x", "y", "SOC.r", "Cin.r")
 
 rc_wu_all <- rbind(
-  cbind(source = "r",   cell = su_df$cell, Cinput = C_rv[19],  CinputFORWARD = rowMeans(C_rv),  rc_wu_r),
-  cbind(source = "min", cell = su_df$cell, Cinput = C_min[19], CinputFORWARD = rowMeans(C_min), rc_wu_min),
-  cbind(source = "max", cell = su_df$cell, Cinput = C_max[19], CinputFORWARD = rowMeans(C_max), rc_wu_max)
+  cbind(source = "r",   cell = su_df$cell, Cinput = C_rv[19],  CinputFORWARD = rowMeans(C_rv),  rc_wu_r)
+  # cbind(source = "min", cell = su_df$cell, Cinput = C_min[19], CinputFORWARD = rowMeans(C_min), rc_wu_min),
+  # cbind(source = "max", cell = su_df$cell, Cinput = C_max[19], CinputFORWARD = rowMeans(C_max), rc_wu_max)
 )
 rc_wu_all$SOC_t0 <- rowSums(rc_wu_all[5:10])
 names(rc_wu_all)[5:10] <- c("time", "DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
@@ -526,6 +534,8 @@ rc_wu_all <- reshape(rc_wu_all, direction = "wide",
                      timevar = "source",
                      v.names = names(rc_wu_all[c(3:4, 6:11)])
 )
+all(su_df$cell == rc_wu_all$cell)
+rc_wu_all$cell <- NULL
 rc_wu_all <- cbind(su_df[vars], rc_wu_all)
 
 
