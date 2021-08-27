@@ -18,6 +18,9 @@ library(SoilR)
 library(raster)
 library(rgdal)
 library(soilassessment)
+library(sp)
+library(sf)
+library(terra)
 
 # working_dir<-setwd("C:/TRAINING_MATERIALS_GSOCseq_MAPS_12-11-2020")
 
@@ -170,6 +173,7 @@ Roth_C<-function(Cinputs,years,DPMptf, RPMptf, BIOptf, HUMptf, FallIOM,Temp,Prec
   
   xi.frame=data.frame(years,rep(fT*fW_2*fC*fPR,length.out=length(years)))
   
+  
   # RUN THE MODEL from SoilR
   #Loads the model Si pass=TRUE genera calcula el modelo aunque sea invalido. 
   #Model3_spin=RothCModel(t=years,C0=c(DPMptf, RPMptf, BIOptf, HUMptf, FallIOM),In=Cinputs,DR=DR,clay=clay,xi=xi.frame, pass=TRUE) 
@@ -201,7 +205,7 @@ NPP_M_MAX<-c()
 NPP_M<-c()
 
 ############for loop starts################
-for (i in 1:5) {
+for (i in 1:528) {
   
   gt<-firstClimLayer
   gp<-gt+clim_layers
@@ -345,6 +349,7 @@ for (i in 1:5) {
     WARM_UP[i,23]<-CinputFOWARD_min
     WARM_UP[i,24]<-CinputFOWARD_max
     
+    
     Cinputs<-c()
     Cinputs_min<-c()
     Cinputs_max<-c()
@@ -380,6 +385,6 @@ colnames(WARM_UP@data)[24]="Cin_max"
 
 
 # SAVE the Points (shapefile)
-setwd("C:/TRAINING_MATERIALS_GSOCseq_MAPS_12-11-2020/OUTPUTS/2_WARM_UP")
+# setwd("C:/TRAINING_MATERIALS_GSOCseq_MAPS_12-11-2020/OUTPUTS/2_WARM_UP")
 writeOGR(WARM_UP,".", "WARM_UP_County_AOI", driver="ESRI Shapefile",overwrite=TRUE)
 
