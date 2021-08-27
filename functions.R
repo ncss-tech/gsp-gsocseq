@@ -74,15 +74,16 @@ fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
   idx  <- rep(1:12, n)
   bare  <- as.data.frame(lapply(COV[, idx], function(x) x > 0.8))
   
-  B <- as.data.frame(lapply(bare, function(x) ifelse(x == FALSE, 1, 1.8)))
-  Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23)
-  Max.TSMD <- as.data.frame(lapply(1 / B, function(x) x * Max.TSMD))
-  rm(B, bare)
+  # B <- as.data.frame(lapply(bare, function(x) ifelse(x == FALSE, 1, 1.8)))
+  # Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23) * 1/B
+  # # Max.TSMD <- as.data.frame(lapply(B, function(x) Max.TSMD * 1 / x ))
   
   Acc.TSMD <- M
   Acc.TSMD[, 1] <- ifelse(M[, 1] > 0, 0, M[, 1])
   
   for (i in 2:ncol(M)) {
+    B <- ifelse(bare[, i] == FALSE, 1, 1.8)
+    Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23) * 1/B
     Acc.TSMD_i <- Acc.TSMD[, i - 1] + M[, i]
     Acc.TSMD[, i] <- ifelse(
       Acc.TSMD_i < 0,
@@ -90,8 +91,9 @@ fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
       0
     )
     Acc.TSMD[, i] <- ifelse(
-      Acc.TSMD[, i] <= Max.TSMD[, i],
-      Max.TSMD[, i],
+      # Acc.TSMD[, i] <= Max.TSMD[, i],
+      Acc.TSMD[, i] <= Max.TSMD,
+      Max.TSMD,
       Acc.TSMD[, i]
     )
   }
@@ -100,9 +102,11 @@ fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
   
   for (i in 1:ncol(fW)) {
     fW[, i] <- ifelse(
-      Acc.TSMD[, i] > 0.444 * Max.TSMD[, i], 
+      # Acc.TSMD[, i] > 0.444 * Max.TSMD[, i],
+      Acc.TSMD[, i] > 0.444 * Max.TSMD,
       1, 
-      (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i]) / (Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
+      # (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i]) / (Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
+      (0.2 + 0.8 * ((Max.TSMD - Acc.TSMD[, i]) / (Max.TSMD - 0.444 * Max.TSMD)))
     )
     fW[, i] <- raster::clamp(fW[, i], lower = 0.2)
   }
@@ -143,14 +147,17 @@ rothC_wu <- function(
   C_m, 
   xi_df, 
   model = "euler" 
-  # n_clus = 7
 ) {
-  
-  # clus <- makeCluster(n_clus)
-  # 
-  # clusterExport(clus, list("su_df", "C_m", "xi_df", "time", "nSim", "carbonTurnover"))
-  
+
   wu_l <- parLapply(clus, 1:nrow(su_df), function(i) {
+    
+    ncols  <- ncol(xi_df)
+    nyrs    <- ncols / 12 
+    df_idx <- data.frame(
+      yr = rep(1:nyrs, each = 12),
+      cn = 1:ncols
+    )
+    idx <- df_idx[df_idx$yr == 1, ]$cn
     
     temp <- carbonTurnover(
       tt   = time,
@@ -160,22 +167,27 @@ rothC_wu <- function(
       clay = su_df[i, pClay_var],
       effcts = data.frame(
         time, 
-        rep(unlist(xi_df[i, 2:ncol(xi_df)]), length.out = length(time))
+        xi = unlist(xi_df[i, idx])
       ),
       solver = model
     )
     fp <- list(tail(temp, 1))
     
+    
     for (j in 2:nSim) {
+
+      idx2 <- df_idx[df_idx$yr == j, ]$cn
+
       temp <- carbonTurnover(
         tt   = time,
-        C0   = c(fp[[1]][2:6]),
+        C0   = fp[[1]][2:6],
         In   = C_m[i, j],
         Dr   = su_df[i, DR_var],
         clay = su_df[i, pClay_var],
         effcts = data.frame(
-          time, rep(unlist(xi_df[i, 2:ncol(xi_df)]), length.out = length(time))
-        ),
+          time,
+          xi = unlist(xi_df[i, idx2])
+          ),
         solver = model
       )
       fp[[1]] <- tail(temp, 1)
@@ -185,8 +197,6 @@ rothC_wu <- function(
     
     return(fp)
   })
-  
-  # stopCluster(clus)
 }
 
 
@@ -201,6 +211,14 @@ rothC_wu_nn <- function(
   
   wu_l <- parLapply(clus, 1:nrow(su_df), function(i) {
     
+    ncols  <- ncol(xi_df)
+    nyrs    <- ncols / 12 
+    df_idx <- data.frame(
+      yr = rep(1:nyrs, each = 12),
+      cn = 1:ncols
+    )
+    idx <- df_idx[df_idx$yr == 1, ]$cn
+    
     temp <- RothCModel(
       t    = time,
       C0   = as.numeric(su_df[i, C0_vars]),
@@ -209,13 +227,16 @@ rothC_wu_nn <- function(
       clay = su_df[i, pClay_var],
       xi   = data.frame(
         time, 
-        rep(unlist(xi_df[i, 2:ncol(xi_df)]), length.out = length(time))
+        xi = unlist(xi_df[i, idx])
       ),
       pass = TRUE
     )
     fp <- list(tail(getC(temp), 1))
     
-    for (j in 2:19) {
+    for (j in 2:nSim) {
+      
+      idx2 <- df_idx[df_idx$yr == j, ]$cn
+      
       temp <- RothCModel(
         t    = time,
         C0   = as.numeric(fp[[1]][1:5]),
@@ -223,7 +244,8 @@ rothC_wu_nn <- function(
         DR   = su_df[i, DR_var],
         clay = su_df[i, pClay_var],
         xi   = data.frame(
-          years, rep(unlist(xi_df[i, 2:ncol(xi_df)]), length.out = length(time))
+          years, 
+          xi = unlist(xi_df[i, idx2])
         ),
         pass = TRUE
       )
