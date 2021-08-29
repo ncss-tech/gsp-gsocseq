@@ -19,7 +19,8 @@ fr_df <- fr_df[order(fr_df$cell), ]
 
 # warm up
 wu_df <- readRDS(file = "rothC_r_wu_final.rds")
-
+wu_df$x <- NULL
+wu_df$y <- NULL
 
 # combine
 fr_df <- merge(fr_df, wu_df, by = "cell", all.y = TRUE)
@@ -79,15 +80,15 @@ fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
 # Temperature effects per month ----
 fT_r   <- as.data.frame(lapply(TEMP,        function(x) {
   temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
+  # temp <- ifelse(is.na(temp), 0, temp)
 }))
 fT_min <- as.data.frame(lapply(TEMP * 1.02, function(x) {
   temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
+  # temp <- ifelse(is.na(temp), 0, temp)
 }))
 fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) {
   temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
+  # temp <- ifelse(is.na(temp), 0, temp)
 }))
 
 
@@ -161,7 +162,7 @@ rothC_bau <- parLapply(clus, 1:nrow(fr_df), function(i) {
   fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_bau, file = "rothC_fr_bau.rds")
+saveRDS(rothC_bau, file = "rothC_fr_bau.rds")
 stopCluster(clus)
 
 
@@ -185,7 +186,7 @@ rothC_fr_bau_min <- parLapply(clus, 1:nrow(fr_df), function(i) {
   fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_bau_min, file = "rothC_fr_bau_min.rds")
+saveRDS(rothC_fr_bau_min, file = "rothC_fr_bau_min.rds")
 stopCluster(clus)
 
 
@@ -209,7 +210,7 @@ rothC_fr_bau_max <- parLapply(clus, 1:nrow(fr_df), function(i) {
   fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_bau_max, file = "rothC_fr_bau_max.rds")
+saveRDS(rothC_fr_bau_max, file = "rothC_fr_bau_max.rds")
 stopCluster(clus)
 
 
@@ -233,7 +234,7 @@ rothC_fr_low <- parLapply(clus, 1:nrow(fr_df), function(i) {
   fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_low, file = "rothC_fr_low.rds")
+saveRDS(rothC_fr_low, file = "rothC_fr_low.rds")
 stopCluster(clus)
 
 
@@ -257,7 +258,7 @@ rothC_fr_med <- parLapply(clus, 1:nrow(fr_df), function(i) {
   fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_med, file = "rothC_fr_med.rds")
+saveRDS(rothC_fr_med, file = "rothC_fr_med.rds")
 stopCluster(clus)
 
 
@@ -281,7 +282,7 @@ rothC_fr_high <- parLapply(clus, 1:nrow(fr_df), function(i) {
   fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_high, file = "rothC_fr_high.rds")
+saveRDS(rothC_fr_high, file = "rothC_fr_high.rds")
 stopCluster(clus)
 
 
@@ -305,7 +306,7 @@ rothC_fr_medmin <- parLapply(clus, 1:nrow(fr_df), function(i) {
   fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_medmin, file = "rothC_fr_medmin.rds")
+saveRDS(rothC_fr_medmin, file = "rothC_fr_medmin.rds")
 stopCluster(clus)
 
 
@@ -329,7 +330,7 @@ rothC_fr_medmax <- parLapply(clus, 1:nrow(fr_df), function(i) {
   fp <- tail(temp, 1)
 })
 Sys.time()
-# saveRDS(rothC_fr_medmax, file = "rothC_fr_medmax.rds")
+saveRDS(rothC_fr_medmax, file = "rothC_fr_medmax.rds")
 stopCluster(clus)
 
 
