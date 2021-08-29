@@ -29,12 +29,10 @@ setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 
 # Stack_Set_1 is a stack that contains the spatial variables 
 su_df <- readRDS(file = "su_df.RDS")
-vv <- readRDS("vv.rds")
 
-su_df$idx <- paste(su_df$x, su_df$y)
-vv$idx <- paste(vv$x, vv$y)
-
-su_df <- su_df[su_df$idx %in% vv$idx, ]
+# vv <- readRDS("vv.rds")
+# su_df <- su_df[su_df$cell %in% vv$ID, ]
+# su_df <- su_df[order(su_df$cell), ]
 
 
 # Extract the layers from the Vector
@@ -208,7 +206,7 @@ rothC_r <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_r, file = "rothC_r_v3_analytical.rds")
+saveRDS(rothC_r, file = "rothC_r_v3_analytical.rds")
 stopCluster(clus)
 
 
@@ -238,7 +236,7 @@ stopCluster(clus)
 # stopCluster(clus)
 
 
-clus <- makeCluster(15)
+clus <- makeCluster(16)
 clusterExport(clus, list("SOC_min", "pClay_min", "xi_min2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
@@ -254,7 +252,7 @@ rothC_min <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_min, file = "rothC_min_v3_analytical.rds")
+saveRDS(rothC_min, file = "rothC_min_v3_analytical.rds")
 stopCluster(clus)
 
 
@@ -298,7 +296,7 @@ rothC_max <- parLapply(clus, 1:nrow(su_df), function(i) {
   return(temp)
 })
 Sys.time()
-# saveRDS(rothC_max, file = "rothC_max_v3_analytical.rds")
+saveRDS(rothC_max, file = "rothC_max_v3_analytical.rds")
 stopCluster(clus)
 
 
