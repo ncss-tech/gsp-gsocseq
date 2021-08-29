@@ -36,18 +36,18 @@ gsocseq_maps <- within(fr_df, {
   AbsDiff_SSM2_ = f_t.med  - SOC
   AbsDiff_SSM3_ = f_t.high - SOC
   # absolute rate
-  ASR_BAU_  = AbsDiff_BAU_  / 20
-  ASR_SSM1_ = AbsDiff_SSM1_ / 20
-  ASR_SSM2_ = AbsDiff_SSM2_ / 20
-  ASR_SSM3_ = AbsDiff_SSM3_ / 20
+  ASR_BAU_  = AbsDiff_BAU_  / 19
+  ASR_SSM1_ = AbsDiff_SSM1_ / 19
+  ASR_SSM2_ = AbsDiff_SSM2_ / 19
+  ASR_SSM3_ = AbsDiff_SSM3_ / 19
   # relative differences (SSM - SOC BAU)
   RelDiff_SSM1_ = f_t.low  - f_t.bau
   RelDiff_SSM2_ = f_t.med  - f_t.bau
   RelDiff_SSM3_ = f_t.high - f_t.bau
   # relative rate
-  RSR_SSM1_     = RelDiff_SSM1_ / 20
-  RSR_SSM2_     = RelDiff_SSM2_ / 20
-  RSR_SSM3_     = RelDiff_SSM3_ / 20
+  RSR_SSM1_     = RelDiff_SSM1_ / 19
+  RSR_SSM2_     = RelDiff_SSM2_ / 19
+  RSR_SSM3_     = RelDiff_SSM3_ / 19
   # Uncertainties for the Absolute difference SSM_ - SOC2018
   # ASR_BAU_Uncertainty  = sqrt((unc_bau * f_t.bau)^2  + (unc_t0_soc * SOC_t0.r)^2) /
   #   abs(SOC_t0.r + f_t.bau)
