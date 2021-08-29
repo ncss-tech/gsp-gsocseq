@@ -27,9 +27,9 @@ library(terra)
 #Open empty vector
 
 setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
-su_sf <- readRDS(file = "CONUS_su_sf.RDS")
+su_sf <- readRDS(file = "su_sf.RDS")
 Vector <- as(su_sf, "Spatial")[1]
-tile_crop <- (as(readRDS("tile_crop.rds"), "Spatial"))
+tile_crop <- as(readRDS("tile_crop.rds"), "Spatial")
 
 #Open Warm Up Stack
 
@@ -40,14 +40,14 @@ Vector <- crop(Vector, extent(Stack_Set_warmup))
 
 # Open Result from SPIN UP PROCESS. A vector with 5 columns , one for each pool
 
-Spin_up<-readOGR("SPIN_UP_County_AOI.shp")
+Spin_up<-readOGR("SPIN_UP_Country_AOI.shp")
 Spin_up<-as.data.frame(Spin_up)
 Spin_up <- Spin_up[order(Spin_up$cell), ]
 
 # Open Precipitation , temperature, and EVapotranspiration file 20 anios x 12 = 240 layers x 3
 
-PREC <- stack(crop(rast("CONUS_Prec_Stack_228_01_19_TC.tif"), tile_crop))
-TEMP <- stack(crop(rast("CONUS_Temp_Stack_228_01_19_TC.tif"), tile_crop))
+PREC <- stack(crop(rast("CONUS_Prec_Stack_228_01-19_TC.tif"), tile_crop))
+TEMP <- stack(crop(rast("CONUS_Temp_Stack_228_01-19_TC.tif"), tile_crop))
 PET  <- stack(crop(rast("CONUS_PET_Stack_228_01-19_TC.tif"), tile_crop))
 
 #Open Mean NPP MIAMI 1981 - 2000
@@ -67,7 +67,6 @@ NPP_MEAN_MAX<-(LU_AOI==2 | LU_AOI==12 | LU_AOI==13)*NPP_MEAN_MAX*0.53+ (LU_AOI==
 
 
 # Extract variables to points
-
 Vector_points <- extract(Stack_Set_warmup, Vector,        sp = TRUE)
 Vector_points <- extract(TEMP,             Vector_points, sp = TRUE)
 Vector_points <- extract(PREC,             Vector_points, sp = TRUE)
@@ -205,7 +204,7 @@ NPP_M_MAX<-c()
 NPP_M<-c()
 
 ############for loop starts################
-for (i in 1:528) {
+for (i in 1:521) {
   
   gt<-firstClimLayer
   gp<-gt+clim_layers
@@ -264,6 +263,8 @@ for (i in 1:528) {
       
       if (w==1) {Cinputs[w]<-(Spin_up[i,3]/NPP_81_00)*NPP_M[w]} else {Cinputs[w]<-(Cinputs[[w-1]]/ NPP_M[w-1]) * NPP_M[w]} 
       
+      # print(c(Spin_up[i, 3], NPP_81_00, NPP_M[w], Cinputs[w]))
+
       # Cinputs MIN
       
       Tmin<-mean(Temp[,2]*1.02)
@@ -281,6 +282,7 @@ for (i in 1:528) {
       NPP_M_MAX[w]<-(LU_im[i]==2 | LU_im[i]==12 | LU_im[i]==13)*NPP_M_MAX[w]*0.53+ (LU_im[i]==4)*NPP_M_MAX[w]*0.88 + (LU_im[i]==3 | LU_im[i]==5 | LU_im[i]==6 | LU_im[i]==8)*NPP_M_MAX[w]*0.72
       
       if (w==1) {Cinputs_max[w]<-(Spin_up[i,11]/NPP_81_00)*NPP_M_MAX[w]} else {Cinputs_max[w]<-(Cinputs_max[[w-1]]/ NPP_M_MAX[w-1]) * NPP_M_MAX[w]} 
+      
       
       # Run the model for 2001-2018 
       
@@ -312,9 +314,8 @@ for (i in 1:528) {
       
       f_wp_t_max<-f_wp_max[1]+f_wp_max[2]+f_wp_max[3]+f_wp_max[4]+f_wp_max[5]
       
-      print(w)
+      # print(w)
       #print(c(i,SOC,Spin_up[i,3],NPP_81_00,Cinputs[w],f_wp_t))
-      print(c(NPP_M[w],Cinputs[w]))
     }
   }
   if (is.na(mean(Cinputs))){ CinputFOWARD<-NA} else { 
