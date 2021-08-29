@@ -35,10 +35,9 @@ sum(idx)
 wu_df <- wu_df[idx, ]
 su_df <- su_df[idx, ]
 
-vv <- readRDS("Vector_points.rds")
-
-wu_df <- wu_df[wu_df$cell %in% vv$cell, ]
-su_df <- su_df[su_df$cell %in% vv$cell, ]
+# vv <- readRDS("vv.rds")
+# wu_df <- wu_df[wu_df$cell %in% vv$ID, ]
+# su_df <- su_df[su_df$cell %in% vv$ID, ]
 
 
 
@@ -110,10 +109,15 @@ C_min[, 1] <- C_min[, 1] / NPP_min * NPP_M_min[, 1]
 C_max[, 1] <- C_max[, 1] / NPP_max * NPP_M_max[, 1]
 
 
-idx <- 2:19
-C_rv[, idx]  <- sapply(idx, function(i) C_rv[,  i - 1] / NPP_M[, (i - 1)]   * NPP_M[, i])
-C_min[, idx] <- sapply(idx, function(i) C_min[, i - 1] / NPP_M_min[, i - 1] * NPP_M_min[, i])
-C_max[, idx] <- sapply(idx, function(i) C_max[, i - 1] / NPP_M_max[, i - 1] * NPP_M_max[, i])
+for (i in 2:19) {
+  C_rv[, i] <- C_rv[,  i - 1] / NPP_M[, (i - 1)]   * NPP_M[, i]
+}
+for (i in 2:19) {
+  C_min[, i] <- C_min[, i - 1] / NPP_M_min[, i - 1] * NPP_M_min[, i]
+}
+for (i in 2:19) {
+  C_max[, i] <- C_max[, i - 1] / NPP_M_max[, i - 1] * NPP_M_max[, i]
+}
 
 
 saveRDS(C_rv,  "wu_C_rv.rds")
@@ -317,7 +321,7 @@ rothC_r <- rothC_wu(
   xi_df = xi_r
 )
 Sys.time()
-# saveRDS(rothC_r, file = "rothC_r_wu.rds")
+saveRDS(rothC_r, file = "rothC_r_wu.rds")
 stopCluster(clus)
 
 
@@ -325,6 +329,7 @@ stopCluster(clus)
 ### rerun on negative values using a different solver ----
 rc_wu <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu.rds")))
 idx <- which(apply(rc_wu, 1, function(x) any(x < 0)))
+length(idx)
 
 # su_df <- readRDS("su_results_v3_analytical.rds")[idx, ]
 # C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
@@ -347,7 +352,7 @@ rothC_r_nn <- rothC_wu_nn(
   xi_df = xi_r2
 )
 Sys.time()
-# saveRDS(rothC_r_nn, file = "rothC_r_wu_nonneg.rds")
+saveRDS(rothC_r_nn, file = "rothC_r_wu_nonneg.rds")
 stopCluster(clus)
 
 
@@ -364,13 +369,14 @@ rothC_min <- rothC_wu(
   xi_df = xi_min
 )
 Sys.time()
-# saveRDS(rothC_min, file = "rothC_min_wu.rds")
+saveRDS(rothC_min, file = "rothC_min_wu.rds")
 stopCluster(clus)
 
 
 ### rerun on negative values using a different solver ----
 rc_wu_min <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu.rds")))
 idx <- which(apply(rc_wu_min, 1, function(x) any(x < 0)))
+length(idx)
 
 # C_min  <- readRDS("wu_C_min.rds")[idx, ]
 # xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv")[idx, ])
@@ -393,7 +399,7 @@ rothC_min_nn <- rothC_wu_nn(
   xi_df = xi_min2
 )
 Sys.time()
-# saveRDS(rothC_min_nn, file = "rothC_min_wu_nonneg.rds")
+saveRDS(rothC_min_nn, file = "rothC_min_wu_nonneg.rds")
 stopCluster(clus)
 
 
@@ -437,6 +443,7 @@ Sys.time()
 ### rerun on negative values using a different solver ----
 rc_wu_max <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds")))
 idx <- which(apply(rc_wu_max, 1, function(x) any(x < 0)))
+length(idx)
 
 # su_df  <- readRDS("su_results_v3_analytical.rds")[idx, ]
 # C_max  <- readRDS("wu_C_max.rds")[idx, ]
