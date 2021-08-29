@@ -29,17 +29,20 @@ library(sf)
 # Vector<-readOGR("INPUTS/TARGET_POINTS/target_points_sub.shp")
 setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 fr_df <- readRDS(file = "fr_df.RDS")
-fr_sf <- st_as_sf(
-  fr_df,
-  coords = c("x", "y"),
-  crs = 4326
-  )
-
-Vector <- as(fr_sf, "Spatial")[1]
+fr_df <- fr_df[order(fr_df$cell), ]
 
 # OPEN THE RESULT VECTOR FROM THE WARM UP PROCESS
 
 WARM_UP<-readOGR("WARM_UP_County_AOI.shp")
+
+fr_df <- fr_df[fr_df$cell %in% WARM_UP$cell, ]
+fr_sf <- st_as_sf(
+  fr_df,
+  coords = c("x", "y"),
+  crs = 4326
+)
+
+Vector <- as(fr_sf, "Spatial")[1]
 
 # OPEN THE STACK WITH THE VARIABLES FOR THE FOWARD PROCESS
 
@@ -65,8 +68,6 @@ High_PaddyFields<-1.2
 # extract variables to points
 
 # Variables<-extract(Stack_Set_1,Vector,sp=TRUE)
-fr_df <- fr_df[fr_df$cell %in% WARM_UP$cell, ]
-fr_df <- fr_df[order(fr_df$cell), ]
 Variables <- fr_df
 
 # Creates an empty vector
@@ -84,9 +85,9 @@ clay_im<-Variables[[3]]
 
 Cinputs_im<-WARM_UP[[10]]
 
-DR_im<-Variables[[41]]
+DR_im<-Variables[[40]]
 
-LU_im<-Variables[[40]]
+LU_im<-Variables[[41]]
 
 # Define the years to run the model
 
@@ -162,7 +163,7 @@ Roth_C<-function(Cinputs,years,DPMptf, RPMptf, BIOptf, HUMptf, FallIOM,Temp,Prec
 
 # Iterates over the area of interest
 ##################for loop starts###############
-for (i in 1:dim(Variables)[1]) {
+for (i in 1:nrow(Variables)) {
   
   # Extract the variables 
   
