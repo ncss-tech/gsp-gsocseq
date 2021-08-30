@@ -14,56 +14,42 @@ fr_df  <- readRDS(file = "rothC_fr_final.rds")
 # Differences, Rates, and Uncertainties,
 gsocseq_maps <- within(fr_df, {
   unc_bau         = (f_t.baumax - f_t.baumin) / (2 * f_t.bau)  * 100
-  # unc_t0_soc      = (SOC_t0.max - SOC_t0.min) / (2 * SOC_t0.r) * 100
-  unc_t0_soc      = (SOC_t0.max - SOC_t0.min) / (2 * SOC) * 100
+  unc_t0_soc      = (SOC_t0.max - SOC_t0.min) / (2 * SOC_t0.r) * 100
   unc_ssm         = (f_t.medmax - f_t.medmin) / (2 * f_t.med)  * 100
   BAU_Uncertainty = unc_bau
   T0_Uncertainty  = unc_t0_soc
   SSM_Uncertainty = unc_ssm
-  T0_             = SOC
-  # T0_             = SOC_t0.r
+  T0_             = SOC_t0.r
   finalSOC_BAU_   = f_t.bau
   finalSOC_SSM1_  = f_t.low
   finalSOC_SSM2_  = f_t.med
   finalSOC_SSM3_  = f_t.high
   # absolute differences (SSM - SOC 2018)
-  # AbsDiff_BAU_  = f_t.bau  - SOC_t0.r
-  # AbsDiff_SSM1_ = f_t.low  - SOC_t0.r
-  # AbsDiff_SSM2_ = f_t.med  - SOC_t0.r
-  # AbsDiff_SSM3_ = f_t.high - SOC_t0.r
-  AbsDiff_BAU_  = f_t.bau  - SOC
-  AbsDiff_SSM1_ = f_t.low  - SOC
-  AbsDiff_SSM2_ = f_t.med  - SOC
-  AbsDiff_SSM3_ = f_t.high - SOC
+  AbsDiff_BAU_  = f_t.bau  - SOC_t0.r
+  AbsDiff_SSM1_ = f_t.low  - SOC_t0.r
+  AbsDiff_SSM2_ = f_t.med  - SOC_t0.r
+  AbsDiff_SSM3_ = f_t.high - SOC_t0.r
   # absolute rate
-  ASR_BAU_  = AbsDiff_BAU_  / 19
-  ASR_SSM1_ = AbsDiff_SSM1_ / 19
-  ASR_SSM2_ = AbsDiff_SSM2_ / 19
-  ASR_SSM3_ = AbsDiff_SSM3_ / 19
+  ASR_BAU_  = AbsDiff_BAU_  / 20
+  ASR_SSM1_ = AbsDiff_SSM1_ / 20
+  ASR_SSM2_ = AbsDiff_SSM2_ / 20
+  ASR_SSM3_ = AbsDiff_SSM3_ / 20
   # relative differences (SSM - SOC BAU)
   RelDiff_SSM1_ = f_t.low  - f_t.bau
   RelDiff_SSM2_ = f_t.med  - f_t.bau
   RelDiff_SSM3_ = f_t.high - f_t.bau
   # relative rate
-  RSR_SSM1_     = RelDiff_SSM1_ / 19
-  RSR_SSM2_     = RelDiff_SSM2_ / 19
-  RSR_SSM3_     = RelDiff_SSM3_ / 19
+  RSR_SSM1_     = RelDiff_SSM1_ / 20
+  RSR_SSM2_     = RelDiff_SSM2_ / 20
+  RSR_SSM3_     = RelDiff_SSM3_ / 20
   # Uncertainties for the Absolute difference SSM_ - SOC2018
-  # ASR_BAU_Uncertainty  = sqrt((unc_bau * f_t.bau)^2  + (unc_t0_soc * SOC_t0.r)^2) /
-  #   abs(SOC_t0.r + f_t.bau)
-  # ASR_SSM1_Uncertainty = sqrt((unc_ssm * f_t.low)^2  + (unc_t0_soc * SOC_t0.r)^2) /
-  #   abs(SOC_t0.r + f_t.low)
-  # ASR_SSM2_Uncertainty = sqrt((unc_ssm * f_t.med)^2  + (unc_t0_soc * SOC_t0.r)^2) /
-  #   abs(SOC_t0.r + f_t.med)
-  # ASR_SSM3_Uncertainty = sqrt((unc_ssm * f_t.high)^2 + (unc_t0_soc * SOC_t0.r)^2) /
-  #   abs(SOC_t0.r + f_t.high)
-  ASR_BAU_Uncertainty  = sqrt((unc_bau * f_t.bau)^2  + (unc_t0_soc * SOC)^2) /
+  ASR_BAU_Uncertainty  = sqrt((unc_bau * f_t.bau)^2  + (unc_t0_soc * SOC_t0.r)^2) /
     abs(SOC_t0.r + f_t.bau)
-  ASR_SSM1_Uncertainty = sqrt((unc_ssm * f_t.low)^2  + (unc_t0_soc * SOC)^2) /
+  ASR_SSM1_Uncertainty = sqrt((unc_ssm * f_t.low)^2  + (unc_t0_soc * SOC_t0.r)^2) /
     abs(SOC_t0.r + f_t.low)
-  ASR_SSM2_Uncertainty = sqrt((unc_ssm * f_t.med)^2  + (unc_t0_soc * SOC)^2) /
+  ASR_SSM2_Uncertainty = sqrt((unc_ssm * f_t.med)^2  + (unc_t0_soc * SOC_t0.r)^2) /
     abs(SOC_t0.r + f_t.med)
-  ASR_SSM3_Uncertainty = sqrt((unc_ssm * f_t.high)^2 + (unc_t0_soc * SOC)^2) /
+  ASR_SSM3_Uncertainty = sqrt((unc_ssm * f_t.high)^2 + (unc_t0_soc * SOC_t0.r)^2) /
     abs(SOC_t0.r + f_t.high)
   # Uncertainties for the Relative difference  SSM_ - SOCBAU
   RSR_SSM1_Uncertainty = sqrt((unc_ssm * f_t.low)^2  + (unc_bau * f_t.bau)^2) /
