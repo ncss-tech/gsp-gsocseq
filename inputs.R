@@ -199,7 +199,6 @@ gdalUtilities::gdalwarp(
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
-  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -210,7 +209,6 @@ gdalUtilities::gdalwarp(
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
-  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -221,7 +219,6 @@ gdalUtilities::gdalwarp(
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
-  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -232,7 +229,6 @@ gdalUtilities::gdalwarp(
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
-  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -243,7 +239,6 @@ gdalUtilities::gdalwarp(
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
-  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -254,7 +249,6 @@ gdalUtilities::gdalwarp(
   te      = c(bbox(gsoc2)),
   tr      = res(gsoc2),
   r       = "bilinear",
-  ot      = "Int32",
   srcnodata = -3.4e+38,
   dstnodata = -99999
 )
@@ -307,20 +301,16 @@ pet8100 <- pet8100 * 0.1
 pet0119 <- pet0119 * 0.1
 
 writeRaster(
-  tmp8100, datatype = "INT2S",  # gdal = c("COMPRESS=DEFLATE"),
-  filename = paste0(aoi, "_Temp_Stack_228_81-00_TC.tif"), overwrite = TRUE
+  tmp8100, filename = paste0(aoi, "_Temp_Stack_228_81-00_TC.tif"), overwrite = TRUE
 )
 writeRaster(
-  tmp0119, datatype = "INT2S",  # gdal = c("COMPRESS=DEFLATE"),
-  filename = paste0(aoi, "_Temp_Stack_228_01-19_TC.tif"), overwrite = TRUE
+  tmp0119, filename = paste0(aoi, "_Temp_Stack_228_01-19_TC.tif"), overwrite = TRUE
 )
 writeRaster(
-  pet8100, datatype = "INT2S",  # gdal = c("COMPRESS=DEFLATE"),
-  filename = paste0(aoi, "_PET_Stack_228_81-00_TC.tif"), overwrite = TRUE
+  pet8100, filename = paste0(aoi, "_PET_Stack_228_81-00_TC.tif"), overwrite = TRUE
 )
 writeRaster(
-  pet0119, datatype = "INT2S",  # gdal = c("COMPRESS=DEFLATE"),
-  filename = paste0(aoi, "_PET_Stack_228_01-19_TC.tif"), overwrite = TRUE
+  pet0119, filename = paste0(aoi, "_PET_Stack_228_01-19_TC.tif"), overwrite = TRUE
 )
 
 
@@ -357,19 +347,19 @@ pet0119_avg <- avgRS(pet0119, "pet", mos0119)
 
 # cache files
 writeRaster(
-  tmp8100_avg, datatype = "INT2S",  gdal = c("COMPRESS=DEFLATE"),
+  tmp8100_avg, gdal = c("COMPRESS=DEFLATE"),
   filename = paste0(aoi, "_Temp_Stack_81-00_TC.tif"), overwrite = TRUE
   )
 writeRaster(
-  tmp0119_avg, datatype = "INT2S", gdal = c("COMPRESS=DEFLATE"),
+  tmp0119_avg, gdal = c("COMPRESS=DEFLATE"),
   filename = paste0(aoi, "_Temp_Stack_01-19_TC.tif"), overwrite = TRUE
   )
 writeRaster(
-  ppt8100_avg, datatype = "INT2S", gdal = c("COMPRESS=DEFLATE"), 
+  ppt8100_avg, gdal = c("COMPRESS=DEFLATE"), 
   filename = paste0(aoi, "_Prec_Stack_81-00_TC.tif"), overwrite = TRUE
   )
 writeRaster(
-  ppt0119_avg, datatype = "INT2S", gdal = c("COMPRESS=DEFLATE"), 
+  ppt0119_avg, gdal = c("COMPRESS=DEFLATE"), 
   filename = paste0(aoi, "_Prec_Stack_01-19_TC.tif"), overwrite = TRUE
   )
 writeRaster(
@@ -411,19 +401,19 @@ pet0119_avg_yr <- avgRS(pet0119, "pet",  yrs0119)
 
 # cache averages by year
 writeRaster(
-  tmp8100_avg_yr, datatype = "INT2S",  gdal = c("COMPRESS=DEFLATE"),
+  tmp8100_avg_yr, gdal = c("COMPRESS=DEFLATE"),
   filename = paste0(aoi, "_Temp_Stack_81-00_TC_yr.tif"), overwrite = TRUE
 )
 writeRaster(
-  tmp0119_avg_yr, datatype = "INT2S", gdal = c("COMPRESS=DEFLATE"),
+  tmp0119_avg_yr, gdal = c("COMPRESS=DEFLATE"),
   filename = paste0(aoi, "_Temp_Stack_01-19_TC_yr.tif"), overwrite = TRUE
 )
 writeRaster(
-  ppt8100_sum_yr, datatype = "INT2S", gdal = c("COMPRESS=DEFLATE"), 
+  ppt8100_sum_yr, gdal = c("COMPRESS=DEFLATE"), 
   filename = paste0(aoi, "_Prec_Stack_81-00_TC_yr.tif"), overwrite = TRUE
 )
 writeRaster(
-  ppt0119_sum_yr, datatype = "INT2S", gdal = c("COMPRESS=DEFLATE"), 
+  ppt0119_sum_yr, gdal = c("COMPRESS=DEFLATE"), 
   filename = paste0(aoi, "_Prec_Stack_01-19_TC_yr.tif"), overwrite = TRUE
 )
 writeRaster(
@@ -587,7 +577,10 @@ LU_AOI <- rast(paste0(aoi, "_glc_shv10_DOM.tif"))
 
 
 # DR layer ----
-dr <- (LU_AOI == 2 | LU_AOI == 12| LU_AOI == 13) * 1.44 + (LU_AOI == 4) *  0.25 + (LU_AOI == 3 | LU_AOI == 5 | LU_AOI == 6 | LU_AOI == 8) * 0.67
+dr <- (
+   LU_AOI == 2 | LU_AOI == 12| LU_AOI == 13)              * 1.44 + 
+  (LU_AOI == 4)                                           * 0.25 + 
+  (LU_AOI == 3 | LU_AOI == 5 | LU_AOI == 6 | LU_AOI == 8) * 0.67
 names(dr) <- "DR"
 writeRaster(dr, file = paste0(aoi, "_glc_shv10_DOM_DR.tif"), overwrite = TRUE)
 
@@ -641,10 +634,13 @@ saveRDS(test, "tile_crop.rds")
 # writeRaster(su_sub, filename = "Stack_Set_SPIN_UP_AOI.tif", filetype = "GTiff", overwrite = TRUE)
 
 
+# subset for testing
 set.seed(42)
 idx <- sample(1:nrow(su_df), 20000)
-saveRDS(su_df[idx, ], file = "su_df.RDS")
-saveRDS(su_sf[idx, ], file = "su_sf.RDS")
+su_df <- su_df[idx, ]
+su_sf <- su_sf[idx, ]
+saveRDS(su_df, file = "su_df.RDS")
+saveRDS(su_sf, file = "su_sf.RDS")
 
 
 # set.seed(42)
