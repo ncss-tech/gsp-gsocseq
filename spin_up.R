@@ -1,82 +1,59 @@
+
+# SPATIAL SOIL R  for VECTORS
+#
+# ROTH C phase 1: SPIN UP
+
+# MSc Ing Agr Luciano E Di Paolo
+# Dr Ing Agr Guillermo E Peralta
+# Dr. Ing Rene Dechow
+################################
+
+
+#13_1_ROTHC_C_SPIN_UP_UNC_v66.R
+
+# This script performs uncertainty runs with RothC and quantifies
+# Pool distributions as well as equilibrium C input for various scenarios
+
+###################################
+# SOilR from Sierra, C.A., M. Mueller, S.E. Trumbore (2012). 
+#Models of soil organic matter decomposition: the SoilR package, version 1.0 Geoscientific Model Development, 5(4), 
+#1045--1060. URL http://www.geosci-model-dev.net/5/1045/2012/gmd-5-1045-2012.html.
+###################################
+
+#Empty the global environment
 rm(list=ls()) 
 
+#Load packages
 library(SoilR)
 library(raster)
 library(rgdal)
 library(soilassessment)
 library(sf)
-library(terra)
-
-
-# Set working directory 
+library(sp)
 
 # Set working directory 
+WD_FOLDER <- "C:/Users/luottoi/Documents/GSOCseq/Module I - Scripts"
+#WD_FOLDER <-"D:/TRAINING_MATERIALS_GSOCseq_MAPS_12-11-2020"
 
-setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
-su_sf <- readRDS(file = "su_sf.RDS")
-su_sf <- su_sf[order(su_sf$cell), ]
-Vector <- as(su_sf, "Spatial")[1]
-
-
-# Vector<-readOGR("INPUTS/TARGET_POINTS/Target_Points_sub.shp")
-
-
-# Stack_Set_1 is a stack that contains the spatial variables 
-
-Stack_Set_1<- stack("Stack_Set_SPIN_UP_AOI.tif")
-
-# extract variables to points
-
-Vector_variables<-extract(Stack_Set_1,Vector,df=TRUE)
-Vector_variables$ID <- Vector$cell
-Vector_variables <- Vector_variables[order(Vector_variables$ID), ]
-idx <- complete.cases(Vector_variables)
-Vector_variables <- Vector_variables[idx, ]
-saveRDS(Vector_variables, "vv.rds")
-
-
-# Create A vector to save the results
-
-C_INPUT_EQ<-Vector[idx, 1]
-
-
-# use this only for backup
-
-# C_INPUT_EQ<-readOGR("OUTPUTS/1_SPIN_UP/SPIN_UP_BSAS_27-03-2020_332376.shp")
-
-
-# Extract the layers from the Vector
-
-SOC_im<-Vector_variables[[2]] # primera banda del stack
-
-clay_im<-Vector_variables[[3]] # segunda banda del stack 
-
-DR_im<-Vector_variables[[40]]
-
-LU_im<-Vector_variables[[41]]
-
-# Define Years for Cinputs calculations
-
-years=seq(1/12,500,by=1/12)
-
+setwd(WD_FOLDER)
 
 ########################################################
-# calculates some iom in t / ha
-# input
-# 1. c total carbpn stock in t /ha
+# calculate IOM in t/ha
+# C input
+# total carbon stock in t/ha
 #####################################################
 fIOM.Falloon.RothC =function(c, par1=-1.31, par2=1.139)
 {
   
-  # IOM=10^(par1+par2*log10(c))
+ # IOM=10^(par1+par2*log10(c))
   IOM=0.049*SOC^(1.139) 
   IOM
 }
 
-
 #################################################################################
 # fget_equilibrium_fractions.RothC_input 
 # brief: quantifies pool distribution and C input for RothC at equilibrium
+#
 #Input
 # xi= scalar representing an averaged modifying factor
 # C.tot = initial C stock (and C stock in equilibrium)
@@ -94,7 +71,6 @@ fget_equilibrium_fractions.RothC_input=function(xi=1,C.tot,clay, fractI)
   IOM= fIOM.Falloon.RothC(c = C.tot)
   C.active=C.tot-IOM 
   
-  
   ########################################################################
   #The analytical solution of RothC
   ########################################################################
@@ -111,8 +87,6 @@ fget_equilibrium_fractions.RothC_input=function(xi=1,C.tot,clay, fractI)
   k.rpm=ks[2]
   k.bio=ks[3]
   k.hum=ks[4]
-  
-  
   ########################################################################
   # the carbon use efficiency
   ########################################################################
@@ -168,7 +142,7 @@ fget_equilibrium_fractions.RothC_input=function(xi=1,C.tot,clay, fractI)
   
   #C.dpm=i.dpm * u.dpm.dpm + C0 * s.dpm
   
-  ######################################################################################################
+ 
   ######################################################################################################
   # RPM C ( is all C.80)
   ######################################################################################################
@@ -193,16 +167,52 @@ fget_equilibrium_fractions.RothC_input=function(xi=1,C.tot,clay, fractI)
   fract.all=c(fract.dpm,fract.rpm,fract.bio,fract.hum)
   
   ###################################################
-  # IOM
+  # so unfortunately we have the IOM
   ###################################################
   fract.all_stock=(fract.all*C.active)
   fract.all=fract.all_stock/C.tot
   fract.all=append(fract.all,IOM/C.tot)
   pools=fract.all*C.tot
-  
   Cin=(C.tot-pools[5])/denominator
   list(pools,Cin)
 }
+
+
+setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
+su_sf <- readRDS(file = "CONUS_su_sf.RDS")
+Vector <- as(su_sf, "Spatial")
+
+# Vector<-readOGR("INPUTS/TARGET_POINTS/Target_Points_sub.shp")
+
+
+# Stack_Set_1 is a stack that contains the spatial variables 
+
+Stack_Set_1<- stack("Stack_Set_SPIN_UP_AOI.tif")
+
+# extract variables to points
+
+Vector_variables<-extract(Stack_Set_1,Vector,df=TRUE)
+idx <- complete.cases(Vector_variables)
+Vector_variables <- Vector_variables[idx, ]
+
+
+# Create A vector to save the results
+
+C_INPUT_EQ<-Vector[idx, 1]
+
+# Extract the layers from the Vector
+
+SOC_im<-Vector_variables[[2]] # primera banda del stack
+
+clay_im<-Vector_variables[[3]] # segunda banda del stack 
+
+DR_im<-Vector_variables[[40]]
+
+LU_im<-Vector_variables[[41]]
+
+# Define Years for Cinputs calculations
+
+years=seq(1/12,2000,by=1/12)
 
 # ROTH C MODEL FUNCTION . 
 
@@ -247,7 +257,7 @@ Roth_C_equi_analy<-function(Cinputs,Temp,Precip,Evp,Cov2,soil.thick,SOC,clay,DR,
     b = ifelse(Acc.TSMD > 0.444 * Max.TSMD, 1, (0.2 + 0.8 * ((Max.TSMD - 
                                                                 Acc.TSMD)/(Max.TSMD - 0.444 * Max.TSMD))))
     b<-clamp(b,lower=0.2)
-    return(data.frame(b))   
+    return(data.frame(b))	
   }
   
   fW_2<- fw1func(P=(Precip[,2]), E=(Evp[,2]), S.Thick = soil.thick, pClay = clay, pE = 1, bare=bare1)$b 
@@ -257,7 +267,7 @@ Roth_C_equi_analy<-function(Cinputs,Temp,Precip,Evp,Cov2,soil.thick,SOC,clay,DR,
   fC<-Cov2[,2]
   
   # Set the factors frame for Model calculations
-  
+
   xi=mean(fT*fW_2*fC*fPR)
   
   # RUN THE MODEL 
@@ -269,20 +279,18 @@ Roth_C_equi_analy<-function(Cinputs,Temp,Precip,Evp,Cov2,soil.thick,SOC,clay,DR,
   #Ct3_spin=getC(Model3_spin)
   
   # Get the final pools of the time series
-  
+ 
   
   return(result)
 }
-
-######### function set up ends###############
+########## function set up ends###############
 
 # Iterates over the area of interest
 #source("D:/projecte/Rlibs/dataframe_ops.R")
 
 ########for loop starts###############3
 for (i in 1:dim(Vector_variables)[1]) {
-  
-  
+
   # Extract the variables 
   
   Vect<-as.data.frame(Vector_variables[i,])
@@ -295,7 +303,7 @@ for (i in 1:dim(Vector_variables)[1]) {
   
   Evp<-as.data.frame(t(Vect[28:39]))
   Evp<-data.frame(Month=1:12, Evp=Evp[,1])
-  
+  	
   Cov<-as.data.frame(t(Vect[42:53]))
   Cov1<-data.frame(Cov=Cov[,1])
   Cov2<-data.frame(Month=1:12, Cov=Cov[,1])
@@ -306,7 +314,7 @@ for (i in 1:dim(Vector_variables)[1]) {
       any(is.na(Precip[,2]))  |  any(is.na(Cov2[,2]))  |  any(is.na(Cov1[,1]))  | any(is.na(DR_im[i])) |  
       (SOC_im[i]<0) | (clay_im[i]<0) ) {C_INPUT_EQ[i,2]<-0
   }else{
-    
+  
     # Set the variables from the images
     
     soil.thick=30  #Soil thickness (organic layer topsoil), in cm
@@ -332,9 +340,10 @@ for (i in 1:dim(Vector_variables)[1]) {
     clay_min<-clay*0.9
     clay_max<-clay*1.1
     
-    ##############################################################################  
-    # C input equilibrium. (Ceq) + Ceq_MIN + Ceq_MAX are quantified here
-    ##############################################################################  
+   
+  ##############################################################################  
+  # C input equilibrium. (Ceq) + Ceq_MIN + Ceq_MAX are quantified here
+  ##############################################################################  
     
     #fb<-Roth_C(Cinputs=b,years=years,DPMptf=0, RPMptf=0, BIOptf=0, HUMptf=0, FallIOM=FallIOM,Temp=Temp,Precip=Precip,Evp=Evp,Cov=Cov,Cov1=Cov1,Cov2=Cov2,soil.thick=soil.thick,SOC=SOC,clay=clay,DR=DR,bare1=bare1,LU=LU)
     #fb_t<-fb[1]+fb[2]+fb[3]+fb[4]+fb[5]
@@ -360,11 +369,11 @@ for (i in 1:dim(Vector_variables)[1]) {
     result=Roth_C_equi_analy(Cinputs=b,Temp=Temp,Precip=Precip,Evp=Evp,Cov2=Cov2,soil.thick,SOC_max,clay_max,DR,bare1,LU)
     Ceq_MAX = result[[2]]
     pool.equi.max = result[[1]]
-    
+  
     # SOC POOLS AFTER 500 YEARS RUN WITH C INPUT EQUILIBRIUM
     good_landuse_classes=c(2,12,13,4,3,5,6,8)
     if (LU %in% good_landuse_classes){
-      
+     
       C_INPUT_EQ[i,2]<-SOC
       C_INPUT_EQ[i,3]<-Ceq
       C_INPUT_EQ[i,4]<-sum(pool.equi.mean)
@@ -387,7 +396,7 @@ for (i in 1:dim(Vector_variables)[1]) {
       C_INPUT_EQ[i,21]<-pool.equi.max[3] #BIO 
       C_INPUT_EQ[i,22]<-pool.equi.max[4] #HUM 
       C_INPUT_EQ[i,23]<-pool.equi.max[5] #IOM 
-      
+    
     }else {
       C_INPUT_EQ[i,2]<-SOC
       C_INPUT_EQ[i,3]<-Ceq
@@ -411,7 +420,7 @@ for (i in 1:dim(Vector_variables)[1]) {
       C_INPUT_EQ[i,21]<-0
       C_INPUT_EQ[i,22]<-0
       C_INPUT_EQ[i,23]<-0
-      
+    
     }
     print(c(i,SOC,Ceq))
     
@@ -446,6 +455,6 @@ colnames(C_INPUT_EQ@data)[23]="IOM_max"
 
 # SAVE the Points (shapefile)
 
-# setwd("D:/TRAINING_MATERIALS_GSOCseq_MAPS_12-11-2020/OUTPUTS/1_SPIN_UP")
-writeOGR(C_INPUT_EQ, ".", "SPIN_UP_Country_AOI", driver="ESRI Shapefile",overwrite=TRUE)
+# setwd("OUTPUTS/1_SPIN_UP")
+writeOGR(C_INPUT_EQ, ".", "SPIN_UP_AOI", driver="ESRI Shapefile",overwrite=TRUE) 
 
