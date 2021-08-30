@@ -42,7 +42,7 @@ fr_sf <- st_as_sf(
   crs = 4326
 )
 
-Vector <- as(fr_sf, "Spatial")[1]
+Vector <- as(fr_sf, "Spatial")[54]
 
 # OPEN THE STACK WITH THE VARIABLES FOR THE FOWARD PROCESS
 
@@ -79,7 +79,7 @@ FOWARD<-Vector
 
 # Extract the layers from the Vector
 
-SOC_im<-WARM_UP[[2]]
+SOC_im<-WARM_UP[[4]]
 
 clay_im<-Variables[[3]] 
 
