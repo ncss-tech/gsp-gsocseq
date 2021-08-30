@@ -48,7 +48,7 @@ Spin_up <- Spin_up[order(Spin_up$cell), ]
 
 PREC <- stack(crop(rast("CONUS_Prec_Stack_228_01-19_TC.tif"), tile_crop))
 TEMP <- stack(crop(rast("CONUS_Temp_Stack_228_01-19_TC.tif"), tile_crop))
-PET  <- stack(crop(rast("CONUS_PET_Stack_228_01-19_TC.tif"), tile_crop))
+PET  <- stack(crop(rast("CONUS_PET_Stack_228_01-19_TC.tif"),  tile_crop))
 
 #Open Mean NPP MIAMI 1981 - 2000
 
@@ -58,10 +58,11 @@ NPP_MEAN_MAX <- raster(crop(rast("CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"), tile
 
 #Open LU layer (year 2000).
 
-LU_AOI <- raster(crop(rast("CONUS_glc_shv10_DOM.tif"), tile_crop))
+LU_AOI <- crop(raster("CONUS_glc_shv10_DOM.tif"), NPP)
+
 
 #Apply NPP coeficientes
-NPP<-(LU_AOI==2 | LU_AOI==12 | LU_AOI==13)*NPP*0.53+ (LU_AOI==4)*NPP*0.88 + (LU_AOI==3 | LU_AOI==5 | LU_AOI==6 | LU_AOI==8)*NPP*0.72
+NPP <-(LU_AOI==2 | LU_AOI==12 | LU_AOI==13)*NPP*0.53+ (LU_AOI==4)*NPP*0.88 + (LU_AOI==3 | LU_AOI==5 | LU_AOI==6 | LU_AOI==8)*NPP*0.72
 NPP_MEAN_MIN<-(LU_AOI==2 | LU_AOI==12 | LU_AOI==13)*NPP_MEAN_MIN*0.53+ (LU_AOI==4)*NPP_MEAN_MIN*0.88 + (LU_AOI==3 | LU_AOI==5 | LU_AOI==6 | LU_AOI==8)*NPP_MEAN_MIN*0.72
 NPP_MEAN_MAX<-(LU_AOI==2 | LU_AOI==12 | LU_AOI==13)*NPP_MEAN_MAX*0.53+ (LU_AOI==4)*NPP_MEAN_MAX*0.88 + (LU_AOI==3 | LU_AOI==5 | LU_AOI==6 | LU_AOI==8)*NPP_MEAN_MAX*0.72
 
@@ -204,7 +205,7 @@ NPP_M_MAX<-c()
 NPP_M<-c()
 
 ############for loop starts################
-for (i in 1:521) {
+for (i in 1:nrow(Vector_points)) {
   
   gt<-firstClimLayer
   gp<-gt+clim_layers
@@ -263,7 +264,7 @@ for (i in 1:521) {
       
       if (w==1) {Cinputs[w]<-(Spin_up[i,3]/NPP_81_00)*NPP_M[w]} else {Cinputs[w]<-(Cinputs[[w-1]]/ NPP_M[w-1]) * NPP_M[w]} 
       
-      # print(c(Spin_up[i, 3], NPP_81_00, NPP_M[w], Cinputs[w]))
+      print(c(Spin_up[i, 3], NPP_81_00, NPP_M[w], Cinputs[w]))
 
       # Cinputs MIN
       
