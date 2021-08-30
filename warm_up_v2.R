@@ -26,7 +26,7 @@ wu_df <- wu_df[order(wu_df$cell), ]
 # Load spin up results
 su_df <- readRDS("su_results_v3_analytical.rds")
 
-all(su_df$cell == wu_df$cell)
+all(su_df$cell == wu_df$cell & su_df$x == wu_df$x & su_df$y & wu_df$y)
 wu_df <- cbind(su_df[-1], wu_df)
 # rm(su_df)
 
@@ -35,9 +35,9 @@ sum(idx)
 wu_df <- wu_df[idx, ]
 su_df <- su_df[idx, ]
 
-# vv <- readRDS("vv.rds")
-# wu_df <- wu_df[wu_df$cell %in% vv$ID, ]
-# su_df <- su_df[su_df$cell %in% vv$ID, ]
+# vp <- readRDS("Vector_points.rds")
+# wu_df <- wu_df[wu_df$cell %in% vp$cell, ]
+# su_df <- su_df[su_df$cell %in% vp$cell, ]
 
 
 
@@ -72,14 +72,14 @@ PREC_sum_min <- PREC_sum * 0.95
 PREC_sum_max <- PREC_sum * 1.05
 
 
-# Apply NPP coeficientes
+# Apply NPP coefficients
 npp_coef <- function(LU, NPP) {
   (LU == 2 | LU == 12 | LU == 13)          * NPP * 0.53 +
   (LU == 4)                                * NPP * 0.88 + 
   (LU == 3 | LU == 5  | LU == 6 | LU == 8) * NPP * 0.72
 }
 
-NPP_rv <- npp_coef(LU, NPP_rv)
+NPP_rv  <- npp_coef(LU, NPP_rv)
 NPP_min <- npp_coef(LU, NPP_min)
 NPP_max <- npp_coef(LU, NPP_max)
 
@@ -466,7 +466,7 @@ rothC_max_nn <- rothC_wu_nn(
   xi_df = xi_max2
 )
 Sys.time()
-# saveRDS(rothC_max_nn, file = "rothC_max_wu_nonneg.rds")
+saveRDS(rothC_max_nn, file = "rothC_max_wu_nonneg.rds")
 stopCluster(clus)
 
 
@@ -508,14 +508,14 @@ sum(apply(rc_wu_r, 1, function(x) any(x < 0)), na.rm = TRUE)
 
 
 # combine
-vars <- c("cell", "x", "y", "SOC.r", "Cin.r")
+vars <- c("cell", "x", "y", "SOC.r")
 
 rc_wu_all <- rbind(
-  cbind(source = "r",   cell = su_df$cell, Cinput = C_rv[19],  CinputFORWARD = rowMeans(C_rv),  rc_wu_r),
-  cbind(source = "min", cell = su_df$cell, Cinput = C_min[19], CinputFORWARD = rowMeans(C_min), rc_wu_min),
-  cbind(source = "max", cell = su_df$cell, Cinput = C_max[19], CinputFORWARD = rowMeans(C_max), rc_wu_max)
+  cbind(source = "r",   cell = su_df$cell, Cinput = C_rv[, 18],  CinputFORWARD = rowMeans(C_rv),  rc_wu_r),
+  cbind(source = "min", cell = su_df$cell, Cinput = C_min[, 18], CinputFORWARD = rowMeans(C_min), rc_wu_min),
+  cbind(source = "max", cell = su_df$cell, Cinput = C_max[, 18], CinputFORWARD = rowMeans(C_max), rc_wu_max)
 )
-rc_wu_all$SOC_t0 <- rowSums(rc_wu_all[5:10])
+rc_wu_all$SOC_t0 <- rowSums(rc_wu_all[6:10])
 names(rc_wu_all)[5:10] <- c("time", "DPM_wu", "RPM_wu", "BIO_wu", "HUM_wu", "IOM_wu")
 
 
