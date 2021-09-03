@@ -13,8 +13,7 @@ setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 
 # Load inputs ----
 # forward stack
-fr_df <- readRDS(file = "fr_df.RDS")
-fr_df <- fr_df[order(fr_df$cell), ]
+fr_df <- readRDS(file = "CONUS_fr_df.RDS")
 
 
 # warm up
@@ -22,29 +21,14 @@ wu_df <- readRDS(file = "rothC_r_wu_final.rds")
 wu_df$x <- NULL
 wu_df$y <- NULL
 
+
 # combine
-fr_df <- merge(fr_df, wu_df, by = "cell", all.y = TRUE)
+fr_df <- merge(fr_df, wu_df, by = "cell", all.y = TRUE, sort = FALSE)
 fr_df <-fr_df[complete.cases(fr_df), ]
 
-
-# Set the increase in Carbon input for each land use and each scenario
-# Crops and Crop trees
-# LU == 2 | LU == 12
-Low_Crops  <- 1.05
-Med_Crops  <- 1.10
-High_Crops <- 1.2
-
-# Shrublands, Grasslands , Herbaceous vegetation flooded & Sparse Vegetation
-# LU == 3 | LU == 5 | LU == 6 | LU == 8
-Low_Grass  <- 1.05
-Med_Grass  <- 1.10
-High_Grass <- 1.2
-
-# Paddy Fields
-# LU == 13
-Low_PaddyFields  <- 1.05
-Med_PaddyFields  <- 1.10
-High_PaddyFields <- 1.2
+# set.seed(42)
+# fr_df <- fr_df[sample(1:nrow(fr_df), size = 50000), ]
+# fr_df <- fr_df[order(fr_df$cell), ]
 
 
 # apply increase ----
@@ -55,8 +39,8 @@ fr_df <- within(fr_df, {
   CinputFORWARD_med     <- ifelse(LU %in% lu_cl, CinputFORWARD.r   * 1.10,        CinputFORWARD.r)
   CinputFORWARD_high    <- ifelse(LU %in% lu_cl, CinputFORWARD.r   * 1.20,        CinputFORWARD.r)
   
-  CinputFORWARD_med_min <- ifelse(LU %in% lu_cl, CinputFORWARD.min * 1.05 - 0.15, CinputFORWARD.min)
-  CinputFORWARD_med_max <- ifelse(LU %in% lu_cl, CinputFORWARD.max * 1.20 + 0.15, CinputFORWARD.max)
+  # CinputFORWARD_med_min <- ifelse(LU %in% lu_cl, CinputFORWARD.min * 1.05 - 0.15, CinputFORWARD.min)
+  # CinputFORWARD_med_max <- ifelse(LU %in% lu_cl, CinputFORWARD.max * 1.20 + 0.15, CinputFORWARD.max)
 })
 
 saveRDS(fr_df, file = "fr_df_Cinputs.rds")
@@ -75,6 +59,25 @@ LU      <- fr_df$LU
 fW_r   <- fW(pClay_r      , PREC,        PET, COV, s_thk = 30, pE = 1)
 fW_min <- fW(pClay_r * 0.9, PREC * 0.95, PET, COV, s_thk = 30, pE = 1)
 fW_max <- fW(pClay_r * 1.1, PREC * 1.05, PET, COV, s_thk = 30, pE = 1)
+
+
+# clus <- makeCluster(16)
+# clusterExport(clus, list("PREC", "PET", "COV", "pClay_r", "fw1func", "clamp"))
+# test <- parLapply(clus, 1:nrow(PREC), function(i) {
+#   fw1func(
+#     P = unlist(PREC[i, ]),
+#     E = unlist(PET[i, ]),
+#     S.Thick = 30,
+#     pClay   = pClay_r[i],
+#     pE      = 1,
+#     bare    = unlist(COV[i, ] > 0.8)
+#     )$b
+# })
+# stopCluster(clus)
+# test <- do.call("rbind", test)
+# 
+# all(fW_r == as.data.frame(test))
+# summary(fW_r - test)
 
 
 # Temperature effects per month ----
@@ -156,8 +159,7 @@ rothC_bau <- parLapply(clus, 1:nrow(fr_df), function(i) {
     In   = fr_df$CinputFORWARD.r[i],
     Dr   = fr_df$DR[i],
     clay = fr_df$CLAY[i],
-    effcts = data.frame(years, rep(unlist(xi_r[i, 1:12]), length.out = length(years))),
-    solver = "euler"
+    effcts = data.frame(years, unlist(xi_r[i, ]))
   )
   fp <- tail(temp, 1)
 })
@@ -340,13 +342,13 @@ fr_df <- readRDS("fr_df_Cinputs.rds")
 
 vars <- c(
   bau    = "rothC_fr_bau.rds",
-  baumin = "rothC_fr_bau_min.rds",
-  baumax = "rothC_fr_bau_max.rds",
-  low    = "rothC_fr_low.rds",
-  med    = "rothC_fr_med.rds",
-  high   = "rothC_fr_high.rds",
-  medmin = "rothC_fr_medmin.rds",
-  medmax = "rothC_fr_medmax.rds"
+  # baumin = "rothC_fr_bau_min.rds",
+  # baumax = "rothC_fr_bau_max.rds",
+  # low    = "rothC_fr_low.rds",
+  # med    = "rothC_fr_med.rds",
+  high   = "rothC_fr_high.rds"
+  # medmin = "rothC_fr_medmin.rds",
+  # medmax = "rothC_fr_medmax.rds"
 )
 roth_l <- lapply(1:length(vars), function(x) {
   cat("reading", vars[x], "\n")
@@ -381,9 +383,9 @@ rc_fr_all <- dcast(
 rc_fr_all <- as.data.frame(rc_fr_all)
 
 vars <- c("aoi", "x", "y", "cell", "SOC", "CLAY", "LU", "SOC_t0.r", 
-          "SOC_t0.min", "SOC_t0.max",
-          "CinputFORWARD.r", 
-          "CinputFORWARD.min", "CinputFORWARD.max"
+          # "SOC_t0.min", "SOC_t0.max",
+          "CinputFORWARD.r" 
+          # "CinputFORWARD.min", "CinputFORWARD.max"
           )
 all(fr_df$cell == rc_fr_all$cell)
 rc_fr_all$cell <- NULL
@@ -392,4 +394,21 @@ rc_fr_final <- cbind(fr_df[vars], rc_fr_all)
 
 saveRDS(rc_fr_final, file = "rothC_fr_final.rds")
 
+
+
+# inspect outputs ----
+test <- readRDS("rothC_r_wu_final.rds")
+set.seed(42)
+idx <- sample(1:nrow(test), size = 20000)
+test <- test[idx, ]
+
+test <- cbind(fr_df, fW_r)
+
+rc_sf <- st_as_sf(
+  test,
+  coords = c("x", "y"),
+  crs    = 4326
+)
+names(rc_sf) <- gsub("\\.", "_", names(rc_sf))
+write_sf(rc_sf, dsn = "test.gpkg", driver = "GPKG", overwrite = TRUE)
 
