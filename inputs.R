@@ -668,7 +668,7 @@ vars <- c(SOC  = paste0(aoi, "_GSOCmap1.5.0.tif"),
 # LU <- stack(replicate(n_wu, raster("CONUS_glc_shv10_DOM.tif")))
 wu_rs  <- rast(vars)
 
-wu_sub <- crop(wu_rs[[1:16]], vect(test))
+# wu_sub <- crop(wu_rs[[1:16]], vect(test))
 # writeRaster(wu_sub[[1:16]], filename = "Stack_Set_WARM_UP_AOI.tif", filetype = "GTiff", overwrite = TRUE)
 
 
@@ -694,29 +694,29 @@ test <- lapply(1:10, function(x) {
                  su_cell = su_sf_sub$cell, 
                  wu_ex
                  )
-  saveRDS(wu_ex, file = paste0("wu_pts_sub_", x, ".rds"))
+  saveRDS(wu_ex, file = paste0("CONUS_", x, "_wu_df.rds"))
 })
 
-f_p <- paste0("wu_pts_sub_", 1:10, ".rds")
-
-wu_pts_p1 <- lapply(f_p[1:5], function(x){
-  temp <- readRDS(file = x)
-})
-wu_pts_p1 <- data.table::rbindlist(wu_pts_p1)
-data.table::fwrite(wu_pts_p1, file = "wu_pts_p1.csv")
-
-
-wu_pts_p2 <- lapply(f_p[6:10], function(x) {
-  temp <- readRDS(file = x)
-})
-wu_pts_p2 <- data.table::rbindlist(wu_pts_p2)
-data.table::fwrite(wu_pts_p2, file = "wu_pts_p2.csv")
-
-
-wu_pts_p1 <- data.table::fread(file = "wu_pts_p1.csv")
-wu_pts_p2 <- data.table::fread(file = "wu_pts_p2.csv")
-wu_pts <- rbind(wu_pts_p1, wu_pts_p2)
-data.table::fwrite(wu_pts, file = "wu_pts.csv")
+# f_p <- paste0("wu_pts_sub_", 1:10, ".rds")
+# 
+# wu_pts_p1 <- lapply(f_p[1:5], function(x){
+#   temp <- readRDS(file = x)
+# })
+# wu_pts_p1 <- data.table::rbindlist(wu_pts_p1)
+# data.table::fwrite(wu_pts_p1, file = "wu_pts_p1.csv")
+# 
+# 
+# wu_pts_p2 <- lapply(f_p[6:10], function(x) {
+#   temp <- readRDS(file = x)
+# })
+# wu_pts_p2 <- data.table::rbindlist(wu_pts_p2)
+# data.table::fwrite(wu_pts_p2, file = "wu_pts_p2.csv")
+# 
+# 
+# wu_pts_p1 <- data.table::fread(file = "wu_pts_p1.csv")
+# wu_pts_p2 <- data.table::fread(file = "wu_pts_p2.csv")
+# wu_pts <- rbind(wu_pts_p1, wu_pts_p2)
+# data.table::fwrite(wu_pts, file = "wu_pts.csv")
 
 
 
