@@ -28,11 +28,7 @@ setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 # Load inputs ----
 
 # Stack_Set_1 is a stack that contains the spatial variables 
-su_df <- readRDS(file = "su_df.RDS")
-
-# vv <- readRDS("vv.rds")
-# su_df <- su_df[su_df$cell %in% vv$ID, ]
-# su_df <- su_df[order(su_df$cell), ]
+su_df <- readRDS(file = "CONUS_su_df.RDS")
 
 
 # Extract the layers from the Vector
@@ -61,15 +57,15 @@ fPR <- (LU == 13) * 0.4 + (LU != 13) * 1
 # Temperature effects per month ----
 fT_r   <- as.data.frame(lapply(TEMP,        function(x) {
   temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
+  # temp <- ifelse(is.na(temp), 0, temp)
 }))
 fT_min <- as.data.frame(lapply(TEMP * 1.02, function(x) {
   temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
+  # temp <- ifelse(is.na(temp), 0, temp)
 }))
 fT_max <- as.data.frame(lapply(TEMP * 0.98, function(x) {
   temp <- fT.RothC(x)
-  temp <- ifelse(is.na(temp), 0, temp)
+  # temp <- ifelse(is.na(temp), 0, temp)
 }))
 
     
@@ -129,7 +125,7 @@ saveRDS(xi_max, "su_effcts_max.rds")
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
-su_df <- readRDS(file = "su_df.RDS")
+su_df <- readRDS(file = "CONUS_su_df.RDS")
 
 years <- seq(1 / 12, 500, by = 1 / 12)
 
@@ -190,7 +186,7 @@ library(parallel)
 # # saveRDS(rothC_r, file = "rothC_r_v3.rds")
 # stopCluster(clus)
 
-clus <- makeCluster(15)
+clus <- makeCluster(16)
 clusterExport(clus, list("SOC_r", "pClay_r", "xi_r2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
@@ -280,7 +276,7 @@ stopCluster(clus)
 # stopCluster(clus)
 
 
-clus <- makeCluster(15)
+clus <- makeCluster(16)
 clusterExport(clus, list("SOC_max", "pClay_max", "xi_max2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
@@ -407,11 +403,14 @@ rothC_dfw2 <- dcast(
 rc_df <- as.data.frame(rothC_dfw2)
 saveRDS(rc_df, file = "su_results_v3_analytical.rds")
 
-
 # inspect outputs
+test <- readRDS("su_results_v3_analytical.rds")
+set.seed(42)
+idx <- sample(1:nrow(test), size = 20000)
+test <- test[idx, ]
 rc_sf <- st_as_sf(
   test,
-  coords = c("X", "Y"),
+  coords = c("x", "y"),
   crs    = 4326
 )
 rc_sf <- rc_sf[rc_sf$aoi == "AK1", ]
