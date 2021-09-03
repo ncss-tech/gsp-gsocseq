@@ -70,20 +70,18 @@ fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
   
   M     <- PREC - PET * pE
   
-  n    <- ncol(M)  / 12
-  idx  <- rep(1:12, n)
-  bare  <- as.data.frame(lapply(COV[, idx], function(x) x > 0.8))
+  n   <- ncol(M)  / 12
+  idx <- rep(1:12, n)
+  B   <- as.data.frame(lapply(COV[, idx], function(x) {
+    ifelse(x < 0.8, 1, 1.8)
+    }))
   
-  # B <- as.data.frame(lapply(bare, function(x) ifelse(x == FALSE, 1, 1.8)))
-  # Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23) * 1/B
-  # # Max.TSMD <- as.data.frame(lapply(B, function(x) Max.TSMD * 1 / x ))
+  Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay^2)) * (s_thk/23) * (1/B)
   
   Acc.TSMD <- M
   Acc.TSMD[, 1] <- ifelse(M[, 1] > 0, 0, M[, 1])
   
   for (i in 2:ncol(M)) {
-    B <- ifelse(bare[, i] == FALSE, 1, 1.8)
-    Max.TSMD <- -(20 + 1.3 * pClay - 0.01 * (pClay ^ 2)) * (s_thk / 23) * 1/B
     Acc.TSMD_i <- Acc.TSMD[, i - 1] + M[, i]
     Acc.TSMD[, i] <- ifelse(
       Acc.TSMD_i < 0,
@@ -91,27 +89,25 @@ fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
       0
     )
     Acc.TSMD[, i] <- ifelse(
-      # Acc.TSMD[, i] <= Max.TSMD[, i],
-      Acc.TSMD[, i] <= Max.TSMD,
-      Max.TSMD,
+      Acc.TSMD[, i] <= Max.TSMD[, i],
+      Max.TSMD[, i],
       Acc.TSMD[, i]
     )
   }
   
-  fW <- Acc.TSMD
-  
-  for (i in 1:ncol(fW)) {
-    fW[, i] <- ifelse(
-      # Acc.TSMD[, i] > 0.444 * Max.TSMD[, i],
-      Acc.TSMD[, i] > 0.444 * Max.TSMD,
+  # n <- ncol(Max.TSMD)
+  for (i in 1:ncol(Acc.TSMD)) {
+    
+    Acc.TSMD[, i] <- ifelse(
+      Acc.TSMD[, i] > 0.444 * Max.TSMD[, i], 
       1, 
-      # (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i]) / (Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
-      (0.2 + 0.8 * ((Max.TSMD - Acc.TSMD[, i]) / (Max.TSMD - 0.444 * Max.TSMD)))
-    )
-    fW[, i] <- raster::clamp(fW[, i], lower = 0.2)
+      # (0.2 + 0.8 * ((Max.TSMD[, n] - Acc.TSMD[, i])/(Max.TSMD[, n] - 0.444 * Max.TSMD[, n])))
+      (0.2 + 0.8 * ((Max.TSMD[, i] - Acc.TSMD[, i])/(Max.TSMD[, i] - 0.444 * Max.TSMD[, i])))
+      )
+    Acc.TSMD[, i] <- raster::clamp(Acc.TSMD[, i], lower = 0.2)
   }
   
-  return(fW)
+  return(Acc.TSMD)
 }
 
 
