@@ -628,7 +628,7 @@ saveRDS(su_sf, file = paste0(aoi, "_su_sf.RDS"))
 
 
 test <- st_make_grid(su_sf)
-test <- test[65]
+test <- test[76]
 su_sub <- crop(su_rs, vect(test))
 saveRDS(test, "tile_crop.rds")
 # writeRaster(su_sub, filename = "Stack_Set_SPIN_UP_AOI.tif", filetype = "GTiff", overwrite = TRUE)
@@ -697,7 +697,7 @@ test <- lapply(1:10, function(x) {
   saveRDS(wu_ex, file = paste0("CONUS_", x, "_wu_df.rds"))
 })
 
-# f_p <- paste0("wu_pts_sub_", 1:10, ".rds")
+# f_p <- paste0("CONUS_", 1:10, "_wu_df.rds")
 # 
 # wu_pts_p1 <- lapply(f_p[1:5], function(x){
 #   temp <- readRDS(file = x)
