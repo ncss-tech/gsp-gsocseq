@@ -17,7 +17,7 @@ fr_df <- readRDS(file = "CONUS_fr_df.RDS")
 
 
 # warm up
-wu_df <- readRDS(file = "rothC_r_wu_final.rds")
+wu_df <- readRDS(file = "rothC_r_wu_final_analytical.rds")
 wu_df$x <- NULL
 wu_df$y <- NULL
 
@@ -25,6 +25,11 @@ wu_df$y <- NULL
 # combine
 fr_df <- merge(fr_df, wu_df, by = "cell", all.y = TRUE, sort = FALSE)
 fr_df <-fr_df[complete.cases(fr_df), ]
+
+# test2 <- readOGR(dsn = "FOWARD_County_AOI.shp")
+# fr_df <- fr_df[fr_df$cell %in% test2$cell, ]
+# fr_df <- fr_df[order(fr_df$cell), ]
+
 
 # set.seed(42)
 # fr_df <- fr_df[sample(1:nrow(fr_df), size = 50000), ]
@@ -159,7 +164,8 @@ rothC_bau <- parLapply(clus, 1:nrow(fr_df), function(i) {
     In   = fr_df$CinputFORWARD.r[i],
     Dr   = fr_df$DR[i],
     clay = fr_df$CLAY[i],
-    effcts = data.frame(years, unlist(xi_r[i, ]))
+    effcts = data.frame(years, unlist(xi_r[i, ])),
+    solver = "euler"
   )
   fp <- tail(temp, 1)
 })
@@ -341,12 +347,12 @@ stopCluster(clus)
 fr_df <- readRDS("fr_df_Cinputs.rds")
 
 vars <- c(
-  bau    = "rothC_fr_bau.rds",
+  bau    = "rothC_fr_bau.rds"
   # baumin = "rothC_fr_bau_min.rds",
   # baumax = "rothC_fr_bau_max.rds",
   # low    = "rothC_fr_low.rds",
   # med    = "rothC_fr_med.rds",
-  high   = "rothC_fr_high.rds"
+  # high   = "rothC_fr_high.rds"
   # medmin = "rothC_fr_medmin.rds",
   # medmax = "rothC_fr_medmax.rds"
 )
@@ -374,7 +380,7 @@ names(rc_fr_all)[idx] <- c("DPM_fr", "RPM_fr", "BIO_fr", "HUM_fr", "IOM_fr")
 
 library(data.table)
 
-rc_fr_all <- dcast(
+rc_fr_all <- data.table::dcast(
   as.data.table(rc_fr_all),
   cell + time ~ source,
   value.var = c("DPM_fr", "RPM_fr", "BIO_fr", "HUM_fr", "IOM_fr", "f_t"),
@@ -387,12 +393,14 @@ vars <- c("aoi", "x", "y", "cell", "SOC", "CLAY", "LU", "SOC_t0.r",
           "CinputFORWARD.r" 
           # "CinputFORWARD.min", "CinputFORWARD.max"
           )
-all(fr_df$cell == rc_fr_all$cell)
-rc_fr_all$cell <- NULL
-rc_fr_final <- cbind(fr_df[vars], rc_fr_all)
+# rc_fr_all <- rc_fr_all[order(rc_fr_all$cell), ]
+# fr_df     <- fr_df[order(fr_df$cell), ]
+# all(fr_df$cell == rc_fr_all$cell)
+# rc_fr_all$cell <- NULL
+# rc_fr_final <- cbind(fr_df[vars], rc_fr_all)
+rc_fr_final <- merge(fr_df[vars], rc_fr_all, by = "cell", all.x = TRUE, sort = FALSE)
 
-
-saveRDS(rc_fr_final, file = "rothC_fr_final.rds")
+saveRDS(rc_fr_final, file = "rothC_fr_final_analytical.rds")
 
 
 
