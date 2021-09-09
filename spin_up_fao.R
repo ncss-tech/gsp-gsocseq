@@ -42,7 +42,7 @@ setwd(WD_FOLDER)
 # C input
 # total carbon stock in t/ha
 #####################################################
-fIOM.Falloon.RothC =function(c, par1=-1.31, par2=1.139)
+fIOM.Falloon.RothC =function(SOC, par1=-1.31, par2=1.139)
 {
   
  # IOM=10^(par1+par2*log10(c))
@@ -68,7 +68,7 @@ fIOM.Falloon.RothC =function(c, par1=-1.31, par2=1.139)
 fget_equilibrium_fractions.RothC_input=function(xi=1,C.tot,clay, fractI)
 {   
   rmf=xi
-  IOM= fIOM.Falloon.RothC(c = C.tot)
+  IOM= fIOM.Falloon.RothC(SOC = C.tot)
   C.active=C.tot-IOM 
   
   ########################################################################
@@ -179,9 +179,10 @@ fget_equilibrium_fractions.RothC_input=function(xi=1,C.tot,clay, fractI)
 
 
 setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
-su_sf <- readRDS(file = "CONUS_su_sf.RDS")
-Vector <- as(su_sf, "Spatial")
-
+su_sf <- readRDS(file = "su_sf.RDS")
+tile  <- readRDS(file = "tile_crop.RDS")
+Vector <- as(su_sf[1], "Spatial")
+Vector <- crop(Vector, as(tile, "Spatial"))
 # Vector<-readOGR("INPUTS/TARGET_POINTS/Target_Points_sub.shp")
 
 
@@ -194,6 +195,7 @@ Stack_Set_1<- stack("Stack_Set_SPIN_UP_AOI.tif")
 Vector_variables<-extract(Stack_Set_1,Vector,df=TRUE)
 idx <- complete.cases(Vector_variables)
 Vector_variables <- Vector_variables[idx, ]
+Vector_variables$ID <- Vector$cell
 
 
 # Create A vector to save the results
@@ -269,6 +271,7 @@ Roth_C_equi_analy<-function(Cinputs,Temp,Precip,Evp,Cov2,soil.thick,SOC,clay,DR,
   # Set the factors frame for Model calculations
 
   xi=mean(fT*fW_2*fC*fPR)
+
   
   # RUN THE MODEL 
   
@@ -422,7 +425,7 @@ for (i in 1:dim(Vector_variables)[1]) {
       C_INPUT_EQ[i,23]<-0
     
     }
-    print(c(i,SOC,Ceq))
+    print(c(i,SOC,Ceq, sum(pool.equi.mean)))
     
   } # NA problems
 }
