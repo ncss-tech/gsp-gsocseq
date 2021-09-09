@@ -28,7 +28,8 @@ library(sf)
 
 # Vector<-readOGR("INPUTS/TARGET_POINTS/target_points_sub.shp")
 setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
-fr_df <- readRDS(file = "fr_df.RDS")
+aoi <- "CONUS_"
+fr_df <- readRDS(file = paste0(aoi, "fr_df.RDS"))
 fr_df <- fr_df[order(fr_df$cell), ]
 
 # OPEN THE RESULT VECTOR FROM THE WARM UP PROCESS
@@ -119,7 +120,7 @@ Roth_C<-function(Cinputs,years,DPMptf, RPMptf, BIOptf, HUMptf, FallIOM,Temp,Prec
       Acc.TSMD[1] = ifelse(M[1] > 0, 0, M[1])
       if (Acc.TSMD[i - 1] + M[i] < 0) {
         Acc.TSMD[i] = Acc.TSMD[i - 1] + M[i]
-      }
+      } 
       else (Acc.TSMD[i] = 0)
       if (Acc.TSMD[i] <= Max.TSMD) {
         Acc.TSMD[i] = Max.TSMD
