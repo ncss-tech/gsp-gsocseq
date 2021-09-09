@@ -28,33 +28,39 @@ library(terra)
 
 setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 su_sf <- readRDS(file = "su_sf.RDS")
-Vector <- as(su_sf, "Spatial")[1]
-tile_crop <- as(readRDS("tile_crop.rds"), "Spatial")
+tile   <- readRDS(file = "tile_crop.rds")
+Vector <- as(su_df[1], "Spatial")
+Vector <- crop(Vector, as(tile, "Spatial"))
+
+
 
 #Open Warm Up Stack
 
 Stack_Set_warmup<- stack("Stack_Set_WARM_UP_AOI.tif")
 
-Vector <- crop(Vector, extent(Stack_Set_warmup))
-
 
 # Open Result from SPIN UP PROCESS. A vector with 5 columns , one for each pool
 
-Spin_up<-readOGR("SPIN_UP_Country_AOI.shp")
-Spin_up<-as.data.frame(Spin_up)
+Spin_up <-readOGR("SPIN_UP_AOI.shp")
+Spin_up <-as.data.frame(Spin_up)
 Spin_up <- Spin_up[order(Spin_up$cell), ]
+
+Vector <- Vector[Vector$cell %in% Spin_up$cell, ]
+Vector <- Vector[order(Vector$cell), ]
+
 
 # Open Precipitation , temperature, and EVapotranspiration file 20 anios x 12 = 240 layers x 3
 
-PREC <- stack(crop(rast("CONUS_Prec_Stack_228_01-19_TC.tif"), tile_crop))
-TEMP <- stack(crop(rast("CONUS_Temp_Stack_228_01-19_TC.tif"), tile_crop))
-PET  <- stack(crop(rast("CONUS_PET_Stack_228_01-19_TC.tif"),  tile_crop))
+PREC <- stack(crop(rast("CONUS_Prec_Stack_228_01-19_TC.tif"), tile))
+TEMP <- stack(crop(rast("CONUS_Temp_Stack_228_01-19_TC.tif"), tile))
+PET  <- stack(crop(rast("CONUS_PET_Stack_228_01-19_TC.tif"),  tile))
+
 
 #Open Mean NPP MIAMI 1981 - 2000
 
-NPP          <- raster(crop(rast("CONUS_NPP_MIAMI_MEAN_81-00_AOI.tif"), tile_crop))
-NPP_MEAN_MIN <- raster(crop(rast("CONUS_NPP_MIAMI_MEAN_81-00_AOI_MIN.tif"), tile_crop))
-NPP_MEAN_MAX <- raster(crop(rast("CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"), tile_crop))
+NPP          <- raster(crop(rast("CONUS_NPP_MIAMI_MEAN_81-00_AOI.tif"), tile))
+NPP_MEAN_MIN <- raster(crop(rast("CONUS_NPP_MIAMI_MEAN_81-00_AOI_MIN.tif"), tile))
+NPP_MEAN_MAX <- raster(crop(rast("CONUS_NPP_MIAMI_MEAN_81-00_AOI_MAX.tif"), tile))
 
 #Open LU layer (year 2000).
 
