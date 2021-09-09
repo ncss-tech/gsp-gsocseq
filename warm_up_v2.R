@@ -16,20 +16,29 @@ setwd("D:/geodata/project_data/gsp-gsocseq/CONUS")
 # Load inputs ----
 # Load spin up results
 su_df <- readRDS("su_results_v3_analytical.rds")
-
-# set.seed(42)
-# idx <- sample(1:nrow(su_df), size = 20000)
-# su_df <- su_df[idx, ]
-# su_df <- su_df[order(su_df$cell), ]
+# su_df <- readRDS("su_results_v3_er.rds")
 
 
 # warm up data
-aoi <- "CONUS_10"
+lapply(1:10, function(x) {
+  
+aoi <- paste0("CONUS_", x)
 wu_df <- readRDS(paste0(aoi, "_wu_df.rds"))
 # wu_df <- wu_df[order(wu_df$cell), ]
 
 
+# warm up sample from su_df
+# aoi <- paste0("CONUS_", 1:10)
+# wu_df <- lapply(aoi, function(i) {
+#   tmp <- readRDS(paste0(i, "_wu_df.rds"))
+#   idx <- tmp$cell %in% su_df$cell
+#   tmp <- tmp[idx, ]
+# })
+# wu_df <- do.call("rbind", wu_df)
+
+
 idx <- names(su_df) %in% c("x", "y", "LU", "DR")
+
 wu_df <- merge(su_df[!idx], wu_df, by = "cell", all.y = TRUE, sort = FALSE)
 # rm(su_df)
 
@@ -43,7 +52,6 @@ wu_df <- merge(su_df[!idx], wu_df, by = "cell", all.y = TRUE, sort = FALSE)
 # vp <- readRDS("Vector_points.rds")
 # wu_df <- wu_df[wu_df$cell %in% vp$cell, ]
 # su_df <- su_df[su_df$cell %in% vp$cell, ]
-
 
 
 
@@ -129,39 +137,35 @@ saveRDS(C_rv,  paste0(aoi, "_wu_C_rv.rds"))
 saveRDS(C_min, paste0(aoi, "_wu_C_min.rds"))
 saveRDS(C_max, paste0(aoi, "_wu_C_max.rds"))
 
+})
+
+
+aoi <- "CONUS_"
 
 C_rv <- do.call(
   "rbind", 
   lapply(1:10, function(x){
-    temp <- readRDS(paste0("CONUS_", x, "_wu_C_rv.rds"))
+    temp <- readRDS(paste0(aoi, x, "_wu_C_rv.rds"))
   })
 )
 
 C_min <- do.call(
   "rbind", 
   lapply(1:10, function(x){
-    temp <- readRDS(paste0("CONUS_", x, "_wu_C_min.rds"))
+    temp <- readRDS(paste0(aoi, x, "_wu_C_min.rds"))
   })
 )
 
 C_max <- do.call(
   "rbind", 
   lapply(1:10, function(x){
-    temp <- readRDS(paste0("CONUS_", x, "_wu_C_max.rds"))
+    temp <- readRDS(paste0(aoi, x, "_wu_C_max.rds"))
   })
 )
 
 saveRDS(C_rv,  "wu_C_rv.rds")
 saveRDS(C_min, "wu_C_min.rds")
 saveRDS(C_max, "wu_C_max.rds")
-
-
-
-# rm(wu_df)
-rm(PREC, PREC_sum, PREC_sum_min, PREC_sum_max)
-rm(TEMP, TEMP_avg, TEMP_avg_min, TEMP_avg_max)
-rm(NPP_M, NPP_M_min, NPP_M_max, NPP_rv, NPP_min, NPP_max)
-rm(C_rv, C_min, C_max)
 
 
 
@@ -174,7 +178,7 @@ lapply(paste0("CONUS_", 1:10), function(x) {
   cat("computing ", fn , as.character(Sys.time()), "\n")
   
   wu_df <- readRDS(file = fn)
-  wu_df <- wu_df[wu_df$cell %in% su_df$cell, ]
+  # wu_df <- wu_df[wu_df$cell %in% su_df$cell, ]
   # wu_df <- wu_df[order(wu_df$cell), ]
   
   pClay_r <- wu_df$CONUS_gnatsgo_fy20_1km_clay_wt
@@ -254,6 +258,8 @@ lapply(paste0("CONUS_", 1:10), function(x) {
   saveRDS(xi_r,   paste0(x, "_wu_effcts_r.rds"))
   saveRDS(xi_min, paste0(x, "_wu_effcts_min.rds"))
   saveRDS(xi_max, paste0(x, "_wu_effcts_max.rds"))
+  
+  # run if not looping
   # saveRDS(xi_r,   "wu_effcts_r.rds")
   # saveRDS(xi_min, "wu_effcts_min.rds")
   # saveRDS(xi_max, "wu_effcts_max.rds")
@@ -314,9 +320,13 @@ C_max <- readRDS("wu_C_max.rds")
 
 idx <- complete.cases(su_df)
 sum(!idx)
-su_df <- su_df[idx, ]
-xi_r  <- xi_r[idx, ]
-C_rv  <- C_rv[idx, ]
+su_df  <- su_df[idx, ]
+xi_r   <- xi_r[idx, ]
+C_rv   <- C_rv[idx, ]
+xi_min <- xi_min[idx, ]
+C_min  <- C_min[idx, ]
+xi_max  <- xi_max[idx, ]
+C_max  <- C_max[idx, ]
 
 
 # xi_r2 <- xi_r; C_rv2 <- C_rv
@@ -340,7 +350,6 @@ C_rv  <- C_rv[idx, ]
 library(parallel)
 
 ## C input equilibrium. (Ceq) ----
-# su_df2 <- su_df[1:2000, ]; C_rv2 <- C_rv[1:2000, ]; xi_r2 <- xi_r[1:2000, ]
 
 rn  <- as.integer(1:nrow(su_df))
 p   <- quantile(rn, probs = seq(0, 1, 0.1))
@@ -381,11 +390,6 @@ rc_wu <- as.data.frame(do.call("rbind", lapply(1:10, function(i) {
   })))
 idx <- which(apply(rc_wu, 1, function(x) any(x < 0)))
 length(idx)
-
-# su_df <- readRDS("su_results_v3_analytical.rds")[idx, ]
-# C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
-# xi_r  <- as.data.frame(data.table::fread("wu_effcts_r.csv")[idx, ])
-# xi_r   <- readRDS("wu_effcts_r.rds")[idx, ]
 
 su_df2 <- su_df[idx, ]
 C_rv2  <- C_rv[idx, ]
@@ -438,18 +442,15 @@ Sys.time()
 
 
 ### rerun on negative values using a different solver ----
-rc_wu_min <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu.rds")))
+rc_wu_min <- as.data.frame(do.call("rbind", lapply(1:10, function(i) {
+  do.call("rbind", readRDS(file = paste0("rothC_min_wu_", i, ".rds")))
+})))
 idx <- which(apply(rc_wu_min, 1, function(x) any(x < 0)))
 length(idx)
 
-# C_min  <- readRDS("wu_C_min.rds")[idx, ]
-# xi_min <- as.data.frame(data.table::fread("wu_effcts_min.csv")[idx, ])
-# xi_min <- readRDS("wu_effcts_min.rds")[idx, ]
-
-
-su_df2 <- su_df[idx, ]
+su_df2  <- su_df[idx, ]
 C_min2  <- C_min[idx, ]
-xi_min2  <- xi_min[idx, ]
+xi_min2 <- xi_min[idx, ]
 
 
 clus <- makeCluster(16)
@@ -484,7 +485,7 @@ lapply(1:10, function(i){
   xi_max2 <<- xi_max[idx, ]
   C_max2  <<- C_max[idx, ]
   
-  clus <- makeCluster(16)
+  clus <<- makeCluster(16)
   clusterExport(clus, list("su_df2", "C_max2", "xi_max2", "years", "carbonTurnover", "rothC_wu"))
   
   cat("running", i, as.character(Sys.time()), "\n")
@@ -505,16 +506,12 @@ Sys.time()
 
 
 
-
 ### rerun on negative values using a different solver ----
-rc_wu_max <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds")))
+rc_wu_max <- as.data.frame(do.call("rbind", lapply(1:10, function(i) {
+  do.call("rbind", readRDS(file = paste0("rothC_max_wu_", i, ".rds")))
+})))
 idx <- which(apply(rc_wu_max, 1, function(x) any(x < 0)))
 length(idx)
-
-# su_df  <- readRDS("su_results_v3_analytical.rds")[idx, ]
-# C_max  <- readRDS("wu_C_max.rds")[idx, ]
-# xi_max <- as.data.frame(data.table::fread("wu_effcts_max.csv")[idx, ])
-# xi_max <- readRDS("wu_effcts_max.rds")[idx, ]
 
 su_df2  <- su_df[idx, ]
 C_max2  <- C_max[idx, ]
@@ -543,19 +540,25 @@ rc_wu_r <- as.data.frame(do.call("rbind", lapply(1:10, function(i) {
 })))
 rc_wu_r_nn <- as.data.frame(do.call("rbind", readRDS(file = "rothC_r_wu_nonneg.rds")))
 
-rc_wu_min     <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu.rds")))
+rc_wu_min <- as.data.frame(do.call("rbind", lapply(1:10, function(i) {
+  do.call("rbind", readRDS(file = paste0("rothC_min_wu_", i, ".rds")))
+})))
 rc_wu_min_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_min_wu_nonneg.rds")))
 
-rc_wu_max     <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu.rds")))
+rc_wu_max <- as.data.frame(do.call("rbind", lapply(1:10, function(i) {
+  do.call("rbind", readRDS(file = paste0("rothC_max_wu_", i, ".rds")))
+})))
 rc_wu_max_nn  <- as.data.frame(do.call("rbind", readRDS(file = "rothC_max_wu_nonneg.rds")))
 
+# su_df <- as.data.frame(readRDS(file = "su_results_v3_analytical.rds"))
 su_df <- as.data.frame(readRDS(file = "su_results_v3_analytical.rds"))
 idx <- complete.cases(su_df)
+sum(idx)
 su_df <- su_df[idx, ]
 
-C_rv  <- readRDS("wu_C_rv.rds")
-C_min <- readRDS("wu_C_min.rds")
-C_max <- readRDS("wu_C_max.rds")
+C_rv  <- readRDS("wu_C_rv.rds")[idx, ]
+C_min <- readRDS("wu_C_min.rds")[idx, ]
+C_max <- readRDS("wu_C_max.rds")[idx, ]
 
 
 
@@ -598,7 +601,7 @@ rc_wu_all <- cbind(su_df[vars], rc_wu_all)
 
 
 # save final results
-saveRDS(rc_wu_all, file = "rothC_r_wu_final.rds")
+saveRDS(rc_wu_all, file = "rothC_r_wu_final_analytical.rds")
 
 
 
