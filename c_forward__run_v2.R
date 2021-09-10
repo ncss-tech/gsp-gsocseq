@@ -7,14 +7,14 @@ library(soilassessment)
 library(mapview)
 
 # Set working directory
-setwd("D:\\geodata\\fin_project_data4\\fin_project_data5\\gsp-gsocseq")
+setwd("D:/geodata/project_data/gsp-gsocseqwp")
 
 # Vectorized NPPmodel
 source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
 
 
 # load forward stack
-fr_df <- as.data.frame(readRDS(file = "fr_sdf_v2.RDS"))
+fr_df <- as.data.frame(readRDS(file = "CONUS_fr_df.RDS"))
 # fr_df <- fr_df[complete.cases(fr_df), ]
 # fr_sf <- st_as_sf(
 #     fr_df,
@@ -58,7 +58,8 @@ High_PaddyFields <- 1.2
 fr_df <- fr_df[, !duplicated(colnames(fr_df))]
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++
-idx <- which(colnames(fr_df) %in% c("x", "y"))
+# fr_df <- cbind(sf::st_coordinates(fr_df), fr_df)
+idx <- which(colnames(fr_df) %in% c("X", "Y"))
 xy <- fr_df[, idx]
 data <- data.frame(fr_df[, 57])
 sptest <- SpatialPointsDataFrame(coords = xy, data = data, proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
@@ -207,7 +208,7 @@ library(parallel)
 
 
 # Cinput bau ----
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
 Sys.time()
@@ -231,7 +232,7 @@ stopCluster(clus)
 
 
 # Cinput bau min ----
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("fr_df", "xi_min", "years", "carbonTurnover"))
 
 Sys.time()
@@ -279,7 +280,7 @@ stopCluster(clus)
 
 
 # Cinput low ----
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
 Sys.time()
@@ -303,7 +304,7 @@ stopCluster(clus)
 
 
 # Cinput med ----
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
 Sys.time()
@@ -327,7 +328,7 @@ stopCluster(clus)
 
 
 # Cinput high ----
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("fr_df", "xi_r", "years", "carbonTurnover"))
 
 Sys.time()
@@ -351,7 +352,7 @@ stopCluster(clus)
 
 
 # Cinput med min ----
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("fr_df", "xi_min", "years", "carbonTurnover"))
 
 Sys.time()
@@ -375,7 +376,7 @@ stopCluster(clus)
 
 
 # Cinput med max ----
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("fr_df", "xi_max", "years", "carbonTurnover"))
 
 Sys.time()
@@ -434,13 +435,13 @@ rc_fr_all <- reshape(rc_fr_all, direction = "wide",
                      v.names = names(rc_fr_all[c(4:9)])
 )
 
-vars <- c("x", "y", "SOC", "CLAY", "LU", "SOC_t0.r", "SOC_t0.min", "SOC_t0.max", "CinputFORWARD.r", "CinputFORWARD.min", "CinputFORWARD.max")
+vars <- c("X", "Y", "SOC", "CLAY", "LU", "SOC_t0.r", "SOC_t0.min", "SOC_t0.max", "CinputFORWARD.r", "CinputFORWARD.min", "CinputFORWARD.max")
 # names(fr_df)[3:6] <- vars[1:4]
 
 rc_fr_all2 <- cbind(fr_df[vars], rc_fr_all)
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++
-idx <- which(names(rc_fr_all2) %in% c("x", "y"))
+idx <- which(names(rc_fr_all2) %in% c("X", "Y"))
 xy <- rc_fr_all2[, idx]
 data <- data.frame(rc_fr_all2[, 12])
 sptest <- SpatialPointsDataFrame(coords = xy, data = data, proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
@@ -462,13 +463,13 @@ names(rc_fr_all) <- gsub("\\.", "_", names(rc_fr_all))
 
 rc_fr_final <- st_as_sf(
     rc_fr_all,
-    coords = c("x", "y"),
+    coords = c("X", "Y"),
     crs    = 4326)
     # ) %>%
     # st_transform(4326)
 
-saveRDS(rc_fr_final, file = "ep_rothC_fr_final.rds")
-write_sf(rc_fr_final, dsn = "ep_rothC_fr_final.gpkg", driver = "GPKG", overwrite = TRUE) 
+saveRDS(rc_fr_final, file = "HIAS_rothC_fr_final.rds")
+write_sf(rc_fr_final, dsn = "HIAS_rothC_fr_final.gpkg", driver = "GPKG", overwrite = TRUE) 
 
 
 

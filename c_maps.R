@@ -9,20 +9,20 @@ library(rgdal)
 
 # Set working directory
 # setwd("D:/geodata/project_data/gsp-gsocseq")
+ 
+# setwd("D:/geodata/project_data/gsp-gsocseq")
+# aoi <- "EPAC"
+# fr_df <- readRDS(file = "ep_rothC_fr_final.rds")
 
-setwd("D:\\geodata\\fin_project_data4\\fin_project_data5\\gsp-gsocseq_pe")
-aoi <- "EPAC"
-fr_df <- readRDS(file = "ep_rothC_fr_final_pe.rds")
+setwd("D:/geodata/project_data/gsp-gsocseqwp")
+aoi <- "HIAS"
+fr_df <- readRDS(file = "HIAS_rothC_fr_final.rds")
 
-# setwd("D:\\geodata\\fin_project_data4\\fin_project_data5\\gsp-gsocseqwp")
-# aoi <- "HIAS"
-# fr_df <- readRDS(file = "hias_rothC_fr_final.rds")
-
-# setwd("D:\\geodata\\fin_project_data4\\fin_project_data5\\gsp-gsocseqp")
+# setwd("D:/geodata/project_data/gsp-gsocseqp")
 # aoi <- 'PRVI'
 # fr_df <- readRDS(file = "prvi_rothC_fr_final.rds")
 
-su_sdf <- readRDS(file = "su_sdf_v2.RDS")
+su_sdf <- readRDS(file = "su_sf.RDS")
 
 # fr_df <- fr_df %>%
 #   mutate(x = unlist(map(fr_df$geometry,1)), y = unlist(map(fr_df$geometry,2)))

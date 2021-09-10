@@ -1,9 +1,9 @@
 library(raster)
 
-setwd("D:\\geodata\\fin_project_data4\\fin_project_data4\\gsp-gsocseq_conus")
+setwd("D:/geodata/project_data/gsp-gsocseqwp")
 # ml <- list("file", "min", "max")
 
-rasters <- list.files(".", pattern = ".tif$")
+rasters <- list.files(".", pattern = "^HIAS")
 
 ml <- list()
 for (rast in rasters){

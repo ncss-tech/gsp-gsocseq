@@ -19,11 +19,12 @@ library(soilassessment)
 
 
 # Set working directory
-setwd("D:/geodata/project_data5/gsp-gsocseqwp")
+setwd("D:/geodata/project_data/gsp-gsocseqwp")
 source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
 
+aoi <- "CONUS"
 # Stack_Set_1 is a stack that contains the spatial variables 
-su_sdf <- readRDS(file = "su_sdf_v2.RDS")
+su_sdf <-  readRDS(paste0(aoi, "_su_sf.RDS"))
 su_df  <- as.data.frame(su_sdf)
 
 
@@ -159,7 +160,8 @@ saveRDS(xi_max, "su_effcts_max.rds"); rm(xi_max, fT_max, fW_max, fC, fPR)
 
 # RUN THE MODEL from soilassessment ----
 # Roth C soilassesment in parallel
-su_df <- as.data.frame(readRDS(file = "su_sdf_v2.RDS"))
+# su_df <- as.data.frame(readRDS(file = "su_sdf_v2.RDS"))
+su_df <- su_sdf
 
 years <- seq(1 / 12, 500, by = 1 / 12)
 
@@ -195,7 +197,7 @@ xi_max2 <- rowMeans(xi_max)
 
 library(parallel)
 
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 
 # C input equilibrium. (Ceq) ----
 # clusterExport(clus, list("DR", "pClay_r", "ri_r", "FallIOM_r", "years", "carbonTurnover")) # , "rothC"))
@@ -222,7 +224,7 @@ clus <- makeCluster(4)
 
 source("D:/GIS/TOOLBOXES/gsp-gsocseq/functions.R")
 
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("SOC_r", "pClay_r", "xi_r2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
@@ -268,7 +270,7 @@ stopCluster(clus)
 # stopCluster(clus)
 
 
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("SOC_min", "pClay_min", "xi_min2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
@@ -312,7 +314,7 @@ stopCluster(clus)
 # stopCluster(clus)
 
 
-clus <- makeCluster(4)
+clus <- makeCluster(12)
 clusterExport(clus, list("SOC_max", "pClay_max", "xi_max2", "fractI", "fget_equilibrium_fractions.RothC_input", "fIOM.Falloon.RothC"))
 
 Sys.time()
@@ -332,9 +334,16 @@ saveRDS(rothC_max, file = "rothC_max_v3_analytical.rds")
 stopCluster(clus)
 
 su_df$id <- 1:nrow(su_df)
+su_df <- cbind(sf::st_coordinates(su_df), su_df)
+
+library(tidyverse)
+su_df <- su_df %>%
+  mutate(X = unlist(map(su_df$geometry,2)),
+         Y = unlist(map(su_df$geometry,1)))
+
 
 rothC_r <- as.data.frame(
-  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r,
+  cbind(su_df[c("id", "X", "Y", "LU", "DR")], SOC = SOC_r, FallIOM = FallIOM_r, pClay = pClay_r,
         source = 'r',
   do.call(
     "rbind", 
@@ -342,7 +351,7 @@ rothC_r <- as.data.frame(
     )))
 
 rothC_min <- as.data.frame(
-  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, 
+  cbind(su_df[c("id", "X", "Y", "LU", "DR")], SOC = SOC_min, FallIOM = FallIOM_min, pClay = pClay_min, 
         source = "min",
   do.call(
     "rbind", 
@@ -350,7 +359,7 @@ rothC_min <- as.data.frame(
   )))
 
 rothC_max <- as.data.frame(
-  cbind(su_df[c("id", "x", "y", "LU", "DR")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, 
+  cbind(su_df[c("id", "X", "Y", "LU", "DR")], SOC = SOC_max, FallIOM = FallIOM_max,  pClay = pClay_max, 
         source = "max",
   do.call(
     "rbind", 
@@ -424,7 +433,7 @@ library(data.table)
 
 rothC_dfw2 <- dcast(
   as.data.table(rothC_df), 
-  id + x + y + LU + DR ~ source, 
+  id + X + Y + LU + DR ~ source, 
   value.var = c("SOC", "FallIOM", "pClay", "fract.dpm", "fract.rpm", "fract.bio", "fract.hum", "fract.iom", "Cin", "fract.sum"),
   sep = "."
   )

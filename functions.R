@@ -1,3 +1,48 @@
+# TerraClimate ----
+# function to average months
+avgRS <- function(rs, var, interval) {
+  
+  idx_r  <- class(rs) == "RasterStack"
+  int_nm <- names(interval)
+  
+  rs_l <- lapply(interval, function(x) {
+    vars <- paste0(x, "_", var)
+    idx  <- which(names(rs) %in% vars)
+    cat("averaging", paste(names(rs[[idx]]), collapse = ", "), "\n", "\n")
+    mean(rs[[idx]], na.rm = TRUE)
+  })
+  
+  if (idx_r) {
+    final_rs <- stack(rs_l)
+  } else final_rs <- rast(rs_l)
+  
+  if (!is.null(int_nm)) names(final_rs) <- int_nm
+  
+  return(final_rs)
+}
+
+
+# function to average years
+avgRSyr <- function(rs, var, yrs) { 
+  
+  idx_r <- class(rs) == "RasterStack"
+  
+  rs_l <- lapply(yrs, function(x) {
+    vars <- paste0(x, "_", var)
+    idx  <- which(names(rs) %in% vars)
+    cat("averaging", paste(names(rs[[idx]]), collapse = ", "), "\n", "\n")
+    mean(rs[[idx]], na.rm = TRUE)
+  })
+  
+  if (idx_r) {
+    final_rs <- stack(rs_l)
+  } else final_rs <- rast(rs_l)
+  
+  # names(final_rs) <- paste0("X", substr(x[[1]][1], 2, 5))
+  return(final_rs)
+}
+
+
 fW <- function(pClay, PREC, PET, COV, s_thk = 30, pE = 1) {
   
   M     <- PREC - PET * pE
@@ -76,7 +121,7 @@ rothC_wu <- function(
   xi_df, 
   model = "euler" 
   # n_clus = 7
-  ) {
+) {
   
   # clus <- makeCluster(n_clus)
   # 
@@ -93,9 +138,9 @@ rothC_wu <- function(
       effcts = data.frame(
         time, 
         rep(unlist(xi_df[i, 2:ncol(xi_df)]), length.out = length(time))
-        ),
+      ),
       solver = model
-      )
+    )
     fp <- list(tail(temp, 1))
     
     for (j in 2:nSim) {
@@ -109,14 +154,14 @@ rothC_wu <- function(
           time, rep(unlist(xi_df[i, 2:ncol(xi_df)]), length.out = length(time))
         ),
         solver = model
-        )
+      )
       fp[[1]] <- tail(temp, 1)
     }
     fp <- unlist(fp)
     fp[1] <- nSim
     
     return(fp)
-    })
+  })
   
   # stopCluster(clus)
 }
@@ -128,8 +173,8 @@ rothC_wu_nn <- function(
   su_df, pClay_var, C0_vars, DR_var, 
   C_m, 
   xi_df
-  ) {
-    
+) {
+  
   
   wu_l <- parLapply(clus, 1:nrow(su_df), function(i) {
     
@@ -142,9 +187,9 @@ rothC_wu_nn <- function(
       xi   = data.frame(
         time, 
         rep(unlist(xi_df[i, 2:ncol(xi_df)]), length.out = length(time))
-        ),
+      ),
       pass = TRUE
-      )
+    )
     fp <- list(tail(getC(temp), 1))
     
     for (j in 2:19) {
@@ -156,9 +201,9 @@ rothC_wu_nn <- function(
         clay = su_df[i, pClay_var],
         xi   = data.frame(
           years, rep(unlist(xi_df[i, 2:ncol(xi_df)]), length.out = length(time))
-          ),
+        ),
         pass = TRUE
-        )
+      )
       fp[[1]] <- tail(getC(temp), 1)
     }
     
