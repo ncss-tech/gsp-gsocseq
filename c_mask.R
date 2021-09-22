@@ -17,25 +17,25 @@ rs <- rs[-9]
 
 names(rs) <- 1:length(rs)
 rs
-mast <- raster(rs[4])
-fips <- "USHI840"
+mast <- raster(rs[9])
+fips <- "USVI850"
 
 plot(mast)
 
 
 
-setwd("D:\\geodata\\fin_project_data4\\fin_project_data4\\gsp-gsocseqwp")
+setwd("D:\\geodata\\project_data\\gsp-gsocseqp")
 
 dir.create("RESULTS")
 # fips <- "__GU316"
 
 
 
-socrs <- list.files(".", pattern = "^HIAS")
+socrs <- list.files(".", pattern = "^PRVI")
 
 for(soc in socrs){
   r <- raster(soc)
-  rn <- gsub("HIAS", fips, soc)
+  rn <- gsub("PRVI", fips, soc)
   # # print(nn)
   # writeRaster(msk, filename =  paste0("./RESULTS/", rn), progress = "text", overwrite = TRUE)
   

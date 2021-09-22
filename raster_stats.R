@@ -1,9 +1,10 @@
 library(raster)
+library(xlsx)
 
-setwd("D:/geodata/project_data/gsp-gsocseqwp")
+setwd("D:/geodata/project_data/gsp-gsocseqp")
 # ml <- list("file", "min", "max")
 
-rasters <- list.files(".", pattern = "^HIAS")
+rasters <- list.files(".", pattern = "^PRVI")
 
 ml <- list()
 for (rast in rasters){
@@ -26,6 +27,8 @@ for (rast in rasters){
 
 df <- data.frame(matrix(unlist(ml), nrow=length(ml), byrow = TRUE))
 names(df) <- c("file", "min", "median", "mean", "max")
+write.xlsx(df, file = 'raster_stats.xlsx', sheetName = 'Sheet1', col.names = TRUE, row.names = FALSE)
+
 saveRDS(df, "D:\\geodata\\new_raster_stats.rds")
 
 inDF <- readRDS("D:\\geodata\\new_raster_stats.rds")
