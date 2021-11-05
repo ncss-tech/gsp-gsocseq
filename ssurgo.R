@@ -142,6 +142,33 @@ mu_ak_agg <- read.csv(file = "gnatsgo_ak_gsoc.csv", stringsAsFactors = FALSE)
 
 # rasterize ----
 
+## MLRA ----
+aoi   <- read_sf(dsn = "../AOIs/CONUS.shp")
+gsoc  <- rast("D:/geodata/project_data/gsp-gsocseq/CONUS/GSOCmap1.5.0_CONUS.tif")
+gsoc2 <- crop(gsoc, aoi)
+gsoc2 <- trim(gsoc2)
+
+gdalUtilities::gdal_rasterize(
+  src_datasource = "D:/geodata/soils/MLRA_52.shp",
+  dst_filename   = "D:/geodata/soils/MLRA_52.tif",
+  of             = "GTiff",
+  te             = ext(gsoc2)[c(1, 3, 2, 4)],
+  tr             = res(gsoc2),
+  a_nodata       = -99999
+)
+
+
+gdalUtilities::gdal_rasterize(
+  src_datasource = "D:/geodata/soils/wss_gsmsoil_US_[2016-10-13]/spatial/gsmsoilmu_a_us2.shp",
+  a              = "mukey2",
+  dst_filename   = "D:/geodata/soils/gstatsgo2_fy20_30m.tif",
+  of             = "GTiff",
+  te             = ext(r),
+  tr             = res(r),
+  co             = c("COMPRESS=DEFLATE"),
+  a_nodata       = -99999
+)
+
 ## STATSGO2 ----
 
 # create temp
