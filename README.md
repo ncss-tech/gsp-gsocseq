@@ -4,7 +4,7 @@ Deadline = April 30th!!!
 
 [National Report Template](https://docs.google.com/document/d/1t1mNp55V8z_yJbtr98_Lj-t1JsjZaI_F)
 
-[Technical Manual](https://fao-gsp.github.io/GSOCseq/)
+[Technical Manual](https://fao-sid.github.io/GSOCseq/)
 
 [Training Material](https://drive.google.com/drive/folders/1EM0U7-uUNTdTtjCeJT8b-Uo-8D41z3fx)
 
